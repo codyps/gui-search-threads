@@ -1,7 +1,4 @@
-##############
-## Makefile ##
-##############
-TARGET = gui-search
+TARGET = thread-search
 
 SRC = $(wildcard *.c) 
 HEADER = $(wildcard *.h)
