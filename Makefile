@@ -3,9 +3,11 @@ TARGET = thread-test
 SRC = errors.c threadpool.c
 HEADER = $(wildcard *.h)
 
-OBJ   = $(SRC:=.o)
-OBJA  = threadpool_test.c $(OBJ)
-OBJB  = example_thread.c $(OBJ)
+SRCA = $(SRC) threadpool_test.c
+SRCB = $(SRC) example_thread.c
+
+OBJA  = $(SRCA:=.o)
+OBJB  = $(SRCB:=.o)
 TRASH = gmon.out
 
 CFLAGS= -g
@@ -25,7 +27,7 @@ $(TARGET)-a : $(OBJA)
 	$(LD) $(ALL_LDFLAGS) -o $@ $^
 
 clean:
-	$(RM) $(TARGET) $(TRASH) $(OBJ)
+	$(RM) $(TARGET) $(TRASH) $(OBJA) $(OBJB)
 
 %.c.o : %.c $(HEADER)
 	$(CC) $(ALL_CFLAGS) -c -o $@ $<
