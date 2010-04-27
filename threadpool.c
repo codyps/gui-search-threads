@@ -50,42 +50,6 @@ void *wait_for_work(void *tp_v)
 }
 
 
-threadpool create_threadpool(int nth)
-{
-	if (nth < 1) {
-		return NULL;
-	}
-
-	tpool_t *tp = malloc(sizeof(*tp));
-	if (tp) {
-		tp->thread_ct = nth;
-
-		tp->new_fn = NULL;
-		tp->new_fn_arg = NULL;
-
-		/* Initialize condition variables */
-		pthread_cond_init(&tp->addr_valid_signal);
-		pthread_cond_init(&tp->addr_null_signal);
-
-		/* Initialize mutexes */
-		pthread_mutex_init(&tp->work_lock,NULL);
-		pthread_mutex_init(&tp->addr_valid_lock,NULL);
-		pthread_mutex_init(&tp->addr_null_lock,NULL);
-
-		/* spawn required threads */
-		int i;
-		for( i = 0; i < nth; i++ ) {
-			int ret = pthread_create(NULL, NULL,
-			                         wait_for_work, tp);
-
-			if (ret != 0) {
-				WARN(1,errno,"pthread create %d of %d failed",i,nth);
-			}
-		}
-	}
-	return tp;
-}
-
 void dispatch(threadpool tp_v, dispatch_fn func, void *func_arg)
 {
 	tpool_t *tp = tp_v;
@@ -111,7 +75,81 @@ void dispatch(threadpool tp_v, dispatch_fn func, void *func_arg)
 	return;
 }
 
-void destroy_threadpool(threadpool destroyme)
+void destroy_threadpool(threadpool tp_v)
 {
-	tpool_t *tp = tp_v;	
+	tpool_t *tp = tp_v;
+	
+	{
+		int i;
+		for( i = 0; i < tp->thread_ct; i++ ) {
+			dispatch(tp_v,pthread_exit,NULL);
+		}
+	}
+
+	int ret;
+	ret = pthread_mutex_destroy(&tp->addr_valid_lock);
+	if (ret != 0) {
+			WARN(1,ret,"pthread mutex destory of addr_valid_lock failed");
+	}
+	ret = pthread_mutex_destroy(&tp->addr_null_lock);
+	if (ret != 0) {
+			WARN(1,ret,"pthread mutex destory of addr_null_lock failed");
+	}
+	ret = pthread_mutex_destroy(&tp->work_lock);
+	if (ret != 0) {
+			WARN(1,ret,"pthread mutex destory of work_lock failed");
+	}
+
+
+	ret = pthread_cond_destory(&tp->addr_valid_signal);
+	if (ret != 0) {
+			WARN(1,ret,"pthread cond destory of addr_valid_signal failed");
+	}
+	
+	ret = pthread_cond_destory(&tp->addr_null_signal);
+	if (ret != 0) {
+			WARN(1,ret,"pthread cond destory of addr_null_signal failed");
+	}
+
+	free(tp);
 }
+
+
+threadpool create_threadpool(int nth)
+{
+	if (nth < 1) {
+		return NULL;
+	}
+
+	tpool_t *tp = malloc(sizeof(*tp));
+	if (!tp) {
+		return NULL;
+	}
+
+	tp->thread_ct = nth;
+
+	tp->new_fn = NULL;
+	tp->new_fn_arg = NULL;
+
+	/* Initialize condition variables */
+	pthread_cond_init(&tp->addr_valid_signal);
+	pthread_cond_init(&tp->addr_null_signal);
+
+	/* Initialize mutexes */
+	pthread_mutex_init(&tp->work_lock,NULL);
+	pthread_mutex_init(&tp->addr_valid_lock,NULL);
+	pthread_mutex_init(&tp->addr_null_lock,NULL);
+
+	/* spawn required threads */
+	int i;
+	for( i = 0; i < nth; i++ ) {
+		int ret = pthread_create(NULL, NULL,
+		                         wait_for_work, tp);
+
+		if (ret != 0) {
+			WARN(1,ret,"pthread create %d of %d failed",i,nth);
+		}
+	}
+	return tp;
+}
+
