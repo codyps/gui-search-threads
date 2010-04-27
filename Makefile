@@ -1,21 +1,27 @@
 TARGET = thread-test
 
-SRC = $(wildcard *.c) 
+SRC = errors.c threadpool.c
 HEADER = $(wildcard *.h)
 
 OBJ   = $(SRC:=.o)
+OBJA  = threadpool_test.c $(OBJ)
+OBJB  = example_thread.c $(OBJ)
 TRASH = gmon.out
 
-ALL_CFLAGS = -Wall $(CFLAGS) -pthreads
+CFLAGS= -g
+ALL_CFLAGS = -Wall $(CFLAGS) -pthread
 ALL_LDFLAGS= $(ALL_CFLAGS) $(LDFLAGS)
 
 CC = gcc
 LD = gcc
 RM = rm -f
 
-all: $(TARGET)
+all: $(TARGET)-a $(TARGET)-b
 
-$(TARGET) : $(OBJ)
+$(TARGET)-b : $(OBJB)
+	$(LD) $(ALL_LDFLAGS) -o $@ $^
+
+$(TARGET)-a : $(OBJA)
 	$(LD) $(ALL_LDFLAGS) -o $@ $^
 
 clean:

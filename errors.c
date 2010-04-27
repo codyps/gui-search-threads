@@ -5,7 +5,6 @@
 #include <errno.h>
 
 int debug;/* = 0;*/
-#define unlikely(x)     __builtin_expect((x),0)
 
 void __attribute__((format(printf,5,6)))
 perror_at_line(int status, int errnum, const char *fname,

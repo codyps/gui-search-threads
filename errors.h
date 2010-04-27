@@ -1,8 +1,9 @@
 #ifndef ERRORS_H_
 #define ERRORS_H_
+#include <stdio.h>
 
 #define INFO(...) do {                                                     \
-		if (unlikely(debug)) {                                     \
+		if (debug) {                                               \
 			fprintf(stderr,"INFO: ");                          \
 			perror_at_line(0,0,__func__,__LINE__,__VA_ARGS__); \
 		}                                                          \

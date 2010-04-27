@@ -1,6 +1,8 @@
+#include <pthread.h>
+#include <stdlib.h>
+
 #include "threadpool.h"
 #include "errors.h"
-#include <errno.h>
 
 typedef struct tpool_s {
 	int thread_ct;
@@ -18,18 +20,24 @@ typedef struct tpool_s {
 
 } tpool_t;
 
-
 void *wait_for_work(void *tp_v)
 {
 	tpool_t *tp = tp_v;
 
 	for(;;) {
-		pthread_mutex_lock(&tp->addr_valid_lock);
+		
+		/* aquire M  & K */
 		pthread_mutex_lock(&tp->work_lock);
+		INFO("aquired work_lock");
+		pthread_mutex_lock(&tp->addr_valid_lock);
+		INFO("aquired addr_valid_lock");
+		
 
 		while( tp->new_fn == NULL )
 			pthread_cond_wait(&tp->addr_valid_signal,
 				          &tp->addr_valid_lock);
+
+		
 
 		dispatch_fn work_func = tp->new_fn;
 		void *      work_args = tp->new_fn_arg;
@@ -49,7 +57,6 @@ void *wait_for_work(void *tp_v)
 	}
 }
 
-
 void dispatch(threadpool tp_v, dispatch_fn func, void *func_arg)
 {
 	tpool_t *tp = tp_v;
@@ -65,7 +72,7 @@ void dispatch(threadpool tp_v, dispatch_fn func, void *func_arg)
 
 	/* wait for work to start */
 	pthread_mutex_lock(&tp->addr_null_lock);
-	while( &tp->new_fn != NULL )
+	while( tp->new_fn != NULL )
 		pthread_cond_wait(&tp->addr_null_signal,
 		                  &tp->addr_null_lock);
 	
@@ -89,26 +96,26 @@ void destroy_threadpool(threadpool tp_v)
 	int ret;
 	ret = pthread_mutex_destroy(&tp->addr_valid_lock);
 	if (ret != 0) {
-			WARN(1,ret,"pthread mutex destory of addr_valid_lock failed");
+			WARN(1,ret,"pthread mutex destroy of addr_valid_lock failed");
 	}
 	ret = pthread_mutex_destroy(&tp->addr_null_lock);
 	if (ret != 0) {
-			WARN(1,ret,"pthread mutex destory of addr_null_lock failed");
+			WARN(1,ret,"pthread mutex destroy of addr_null_lock failed");
 	}
 	ret = pthread_mutex_destroy(&tp->work_lock);
 	if (ret != 0) {
-			WARN(1,ret,"pthread mutex destory of work_lock failed");
+			WARN(1,ret,"pthread mutex destroy of work_lock failed");
 	}
 
 
-	ret = pthread_cond_destory(&tp->addr_valid_signal);
+	ret = pthread_cond_destroy(&tp->addr_valid_signal);
 	if (ret != 0) {
-			WARN(1,ret,"pthread cond destory of addr_valid_signal failed");
+			WARN(1,ret,"pthread cond destroy of addr_valid_signal failed");
 	}
 	
-	ret = pthread_cond_destory(&tp->addr_null_signal);
+	ret = pthread_cond_destroy(&tp->addr_null_signal);
 	if (ret != 0) {
-			WARN(1,ret,"pthread cond destory of addr_null_signal failed");
+			WARN(1,ret,"pthread cond destroy of addr_null_signal failed");
 	}
 
 	free(tp);
@@ -117,6 +124,7 @@ void destroy_threadpool(threadpool tp_v)
 
 threadpool create_threadpool(int nth)
 {
+
 	if (nth < 1) {
 		return NULL;
 	}
@@ -132,8 +140,8 @@ threadpool create_threadpool(int nth)
 	tp->new_fn_arg = NULL;
 
 	/* Initialize condition variables */
-	pthread_cond_init(&tp->addr_valid_signal);
-	pthread_cond_init(&tp->addr_null_signal);
+	pthread_cond_init(&tp->addr_valid_signal,NULL);
+	pthread_cond_init(&tp->addr_null_signal,NULL);
 
 	/* Initialize mutexes */
 	pthread_mutex_init(&tp->work_lock,NULL);
@@ -143,7 +151,8 @@ threadpool create_threadpool(int nth)
 	/* spawn required threads */
 	int i;
 	for( i = 0; i < nth; i++ ) {
-		int ret = pthread_create(NULL, NULL,
+		pthread_t thid;
+		int ret = pthread_create(&thid, NULL,
 		                         wait_for_work, tp);
 
 		if (ret != 0) {
