@@ -7,7 +7,7 @@
 typedef struct tpool_s {
 	int thread_ct;
 
-	pthread_mutex_t work_lock; // k
+	//pthread_mutex_t work_lock; // k
 
 	pthread_mutex_t addr_valid_lock; // m
 	pthread_cond_t  addr_valid_signal; // x
@@ -27,8 +27,8 @@ void *wait_for_work(void *tp_v)
 	for(;;) {
 		
 		/* aquire M  & K */
-		pthread_mutex_lock(&tp->work_lock);
-		INFO("aquired work_lock");
+		//pthread_mutex_lock(&tp->work_lock);
+		//INFO("aquired work_lock");
 		pthread_mutex_lock(&tp->addr_valid_lock);
 		INFO("aquired addr_valid_lock");
 		
@@ -50,7 +50,7 @@ void *wait_for_work(void *tp_v)
 		pthread_cond_signal(&tp->addr_null_signal);
 
 		pthread_mutex_unlock(&tp->addr_valid_lock);
-		pthread_mutex_unlock(&tp->work_lock);
+		//pthread_mutex_unlock(&tp->work_lock);
 
 
 		work_func(work_args);
@@ -102,10 +102,10 @@ void destroy_threadpool(threadpool tp_v)
 	if (ret != 0) {
 			WARN(1,ret,"pthread mutex destroy of addr_null_lock failed");
 	}
-	ret = pthread_mutex_destroy(&tp->work_lock);
-	if (ret != 0) {
-			WARN(1,ret,"pthread mutex destroy of work_lock failed");
-	}
+	//ret = pthread_mutex_destroy(&tp->work_lock);
+	//if (ret != 0) {
+	//		WARN(1,ret,"pthread mutex destroy of work_lock failed");
+	//}
 
 
 	ret = pthread_cond_destroy(&tp->addr_valid_signal);
@@ -144,7 +144,7 @@ threadpool create_threadpool(int nth)
 	pthread_cond_init(&tp->addr_null_signal,NULL);
 
 	/* Initialize mutexes */
-	pthread_mutex_init(&tp->work_lock,NULL);
+	//pthread_mutex_init(&tp->work_lock,NULL);
 	pthread_mutex_init(&tp->addr_valid_lock,NULL);
 	pthread_mutex_init(&tp->addr_null_lock,NULL);
 
