@@ -133,91 +133,160 @@ static int cmp_lookup_keyword( const void *key, const void *elem ) {
 	return strcmp(str,(*keyword)->word);
 }
 
-static int sa(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords) {
-	SortedListPtr fileents;
-	keyword_t **k;
-	size_t i = 0;
+struct score {
+	char *filename;
+	long double score;
+};
 
-	if (argc < 1)
-		return -1;
-	k = bsearch( argv[0], keywords, n_keywords, sizeof(*keywords), cmp_lookup_keyword); 
-		
-	if (k) {
-		/* extract fileents */
-		fileents = SLDup((*k)->fileents);
-		for(; i < argc; i++) {
-			k = bsearch( argv[i], keywords, n_keywords, sizeof(*keywords),cmp_lookup_keyword);
-			
-			/* AND */
-			/* for each element in the original fileents,
-			 *  lookup that element in the current keyword's list
- 			 *  if not found, remove from the original fileents.
-	 		 */
-			if (!k)	
-				goto cleanup;
-			SLIntersect(fileents,(*k)->fileents);
-		}
-		/* print out the extracted list */
-		SortedListIteratorPtr iter = SLCreateIterator(fileents);
-		fileent_t *f;
-		f = SLNextItem(iter);
-		if (f) {
-			fputs(f->filename,stdout);
-			while((f = SLNextItem(iter))) {
-				fprintf(stdout, ", %s",f->filename);
-			}
-			fputs(".\n",stdout);
-		}
-		SLDestroyIterator(iter);
-		cleanup:
-		SLDestroy(fileents);
-		return 1;
-	}
-	return -1;
+int cmp_score_by_filename(void *a_, void *b_)
+{
+	struct score a = a_, b = b_;
+
+	return strcoll(a->filename,b->filename);
 }
+
+int cmp_score_by_score(void *a_, void *b_)
+{
+	struct score a = a_, b = b_;
+
+	long double x = a->score - b->score;
+	if (x != 0) {
+		return x;
+	} else {
+		return cmp_score_by_filename(a_,b_);
+	}
+}
+
+
+
+struct query_data {
+	SortedListPtr /* of score */ scores; /* sorted by filename */
+	
+	keyword_t **words;	
+	size_t word_ct;
+};
+
+struct thread_data {
+	size_t word_i; // the one it is responsible for.
+
+	struct query_data *q_data;
+};
+
+/* TODO: 
+ * this function: 
+ * 	score(Q,F) = sum( log( 1 + N / Nt ) * ( 1 + log(Ft) ) ) / sqrt(|F|);
+ *	Ft = fileent's frequency (for term t)
+ *	Nt = number of fileents in a keyword_t
+ *	N = total number of files
+ *	|F| = total number of terms in the file.
+ *	n = number of terms
+ *
+ * make sorted list threadsafe.
+ */
+
+void worker_thread(void *data_v)
+{
+	struct thread_data *data = data_v;
+
+
+	
+	//XXX: for each of our word's files,
+	{
+		//XXX: create a skeleton struct for score with the value set to 0.
+	
+		//XXX: for each of the terms/words
+		{
+			
+
+		}
+
+		//XXX: score(Q,F) should be calculated
+	}
+
+
+}
+
 
 static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords) {
 	SortedListPtr fileents;
 	keyword_t **k;
+	keyword_t **words;
+	size_t words_ct = 0;
 	size_t i = 0;
 	for( i = 0; i < argc; i++) {
 		k = bsearch( argv[i], keywords, n_keywords, sizeof(*keywords), cmp_lookup_keyword); 
 		
 		if (k) {
-			/* extract fileents */
-			fileents = SLDup((*k)->fileents);
-			for(; i < argc; i++) {
-				k = bsearch( argv[i], keywords, n_keywords, sizeof(*keywords),cmp_lookup_keyword);
+			words_ct++;
+			words = realloc(words, words_ct * sizeof(*words));
 
-				/* OR */
-				/* add each fileent to the extracted fileents from argv[0] */
-				if (k)	
-					SLUnion(fileents,(*k)->fileents);
+			words[words_ct-1] = k;
+		}
+	}
+
+	if (words_ct > 0) {
+		// create the query_data.	
+		struct query_data q_data;
+		q_data.words = words;
+		q_data.words_ct = words_ct;
+		q_data.scores = SLCreate(cmp_score_by_filename);
 
 
-				/* AND */
-				/* for each element in the original fileents,
- 				 *  lookup that element in the current keyword's list
-	 			 *  if not found, remove from the original fileents.
-		 		 */
+		// XXX: create the threadpool
+		threadpool tp = create_thread(/* XXX: ct? */);
+
+		// allocate thread data.
+		struct thread_data *t_datas = malloc(sizeof(*t_datas) * words_ct);
+		for(i = 0; i < words_ct; i++) {
+			// populate thread data.
+			t_datas[i].q_data = &q_data;
+			t_datas[i].word_i = i;
+
+			// dispatch work to thread.
+			dispatch(/*XXX: */ tp, workerthread, &t_datas[i]);
+		}
+
+		// wait for all threads to complete.
+		destroy_threadpool(tp);
+
+		// stop leaking t_data.
+		free(t_datas);
+
+
+		/* print out the extracted list */
+
+		// resort the list of (score,filename) by score.
+		SortedListIteratorPtr sort_iter = SLCreateIterator(q_data.scores);
+		if (sort_iter) {
+			SortedListPtr scores_sorted = SLCreate(cmp_score_by_score);
+			struct score *s;
+			while(s = SLNextItem(sort_iter)) {
+				SLInsert(scores_sorted,s);
 			}
-			/* print out the extracted list */
-			SortedListIteratorPtr iter = SLCreateIterator(fileents);
-			if (iter) {
-				fileent_t *f;
+			SLDestroyIterator(sort_iter);
+			SLDestroy(q_data.scores);
 
-				f = SLNextItem(iter);
-				if (f) {
-					fputs(f->filename,stdout);
-					while((f = SLNextItem(iter))) {
-						fprintf(stdout, ", %s",f->filename);
+
+			// print them in order of scoring.
+			SortedListIteratorPtr iter = SLCreateIterator(scores_sorted);
+			if (iter) {
+				struct score *s2;
+				s2 = SLNextItem(iter);
+				if (s2) {
+					// print the first term.
+					fprintf(stdout,"%s (%lf)",s2->filename,s2->score);
+					free(s2);
+					while((s2 = SLNextItem(iter))) {
+						// print following terms preceded by a comma.
+						fprintf(stdout, ", %s (%lf)",s2->filename,s2->score);
+						free(s2);
 					}
 					fputs(".\n",stdout);
 				}
 				SLDestroyIterator(iter);
 			}
-			SLDestroy(fileents);
-
+			SLDestroy(scores_sorted);
+		
 			return 1;
 		}
 	}
@@ -256,13 +325,19 @@ struct cmd {
 } cmds [] = {
 	{"q",q},
 	{"so",so},
-	{"sa",sa},
 	{"look",look},
 	{"tl",testlookup},
 	{}
 };
 
-int main(int argc, char **argv) {	
+
+int main(int argc, char **argv)
+{
+	size_t n_keywords;
+	keyword_t **keywords;
+	SortedListPtr filedatas; /* files sorted by filename */
+
+
 	if (argc != 2) {
 		fprintf(stderr,"usage: %s <index file>\n",argv[0]);
 		return 1;
@@ -273,8 +348,7 @@ int main(int argc, char **argv) {
 		error_at_line(-1,errno,__FILE__,__LINE__,"could not open \"%s\"",argv[1]);
 	}
 
-	size_t n_keywords;
-	keyword_t **keywords = index_read(&n_keywords,fp);
+	keywords = index_read(&n_keywords,fp);
 	fclose(fp);
 	if (!keywords) {
 		error_at_line(-1,errno,__FILE__,__LINE__,"keywords is null");
@@ -286,7 +360,6 @@ int main(int argc, char **argv) {
 		printf("%s%c%c",keywords[i]->word,'\0','\t');
 		print_fileents(keywords[i]->fileents, '\0', "\t::\n",stdout);
 		putchar('\n');	
-
 	}
 	#endif
 

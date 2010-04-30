@@ -17,7 +17,7 @@ void *SLLookup(SortedListPtr s, void *data);
 void SLDestroy(SortedListPtr list);
 int SLInsert(SortedListPtr list, void *newObj);
 int SLRemove(SortedListPtr list, void *newObj);
-
+size_t SLGetCt(SortedListPtr list);
 
 
 SortedListIteratorPtr SLCreateIterator(SortedListPtr list);

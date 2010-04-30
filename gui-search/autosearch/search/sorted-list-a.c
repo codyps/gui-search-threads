@@ -75,29 +75,34 @@ node_t *delete_from_bst(node_t **root, void *data,
 		compare = comparator((*current)->data, data);
 
 		if (compare == 0) {
+			void *ret;
 			if ((*current)->left == NULL
 			    && (*current)->right == NULL) {
+				ret = (*current)->data;
 				free(*current);
 				*current = NULL;
 			} else if ((*current)->left == NULL) {
 				node_t *temp = *current;
 				*current = (*current)->right;
+				ret = temp->data;
 				free(temp);
 			} else if ((*current)->right == NULL) {
 				node_t *temp = *current;
 				*current = (*current)->left;
+				ret = temp->data;
 				free(temp);
 			} else {
 				node_t *temp = (*current)->left;
 				node_t *temp1 = (*current);
 				(*current) = (*current)->right;
+				ret = temp1->data;
 				free(temp1);
 				while (*current != NULL) {
 					current = &((*current)->left);
 				}
 				(*current) = temp;
 			}
-			return *current;
+			return ret;
 		}
 		previous = current;
 		(compare > 0) ? current = &((*current)->right) : (current =
@@ -105,6 +110,7 @@ node_t *delete_from_bst(node_t **root, void *data,
 	}
 	return 0;
 }
+
 
 void *tree_lookup(node_t *root, void *data, CompareFuncT cmp) {
 	if ( root ) {
@@ -157,26 +163,6 @@ node_t *tree_dup(const node_t *t) {
 	}
 }
 
-/** sorted list interface **/
-struct SortedList {
-	struct bstnode *root;
-	size_t ct;
-	CompareFuncT cmp;
-	#ifndef REMOVE_SILLYNESS
-	size_t iter_ct;
-	#endif
-};
-
-struct SortedListIterator {
-	void **start;
-	void **current;
-	size_t len;
-	#ifndef REMOVE_SILLYNESS
-	/* W/SILLYNESS we waste memory by allocating for each iterator. */
-	SortedListPtr list;
-	#endif
-};
-
 void tree_union(node_t **d, node_t *s, size_t *n, CompareFuncT cmp) {
 	if (s) {
 		if (insert_into_bst(d,s->data,cmp))
@@ -185,6 +171,27 @@ void tree_union(node_t **d, node_t *s, size_t *n, CompareFuncT cmp) {
 		tree_union(d,s->right,n,cmp);
 	}
 }
+
+/** sorted list interface **/
+struct SortedList {
+	struct bstnode *root;
+	size_t ct;
+	CompareFuncT cmp;
+
+	pthread_rwlock_t rwlock;
+
+	pthread_mutex_t iter_lock;
+	pthread_mutex_t iter_signal;
+	size_t iter_ct;
+};
+
+struct SortedListIterator {
+	void **start;
+	void **current;
+	size_t len;
+	SortedListPtr list;
+};
+
 
 int SLUnion(SortedListPtr d, const SortedListPtr s) {
 	/* 
@@ -257,6 +264,10 @@ SortedListPtr SLDup(SortedListPtr s) {
 
 void *SLLookup(SortedListPtr s, void *data) {
 	return tree_lookup(s->root,data,s->cmp);
+}
+
+size_t SLGetCt(SortedListPtr list) {
+	return list->ct;
 }
 
 SortedListPtr SLCreate(CompareFuncT cmp)
