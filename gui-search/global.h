@@ -16,6 +16,7 @@ struct global_data {
 	bool auto_index;
 	char *progname;
 	GtkTextBuffer *output_text;
+	int thread_count;
 };
 
 extern struct global_data globals;

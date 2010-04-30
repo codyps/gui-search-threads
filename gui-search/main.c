@@ -116,11 +116,8 @@ void do_search(const char *search_str) {
                              &contents,
                              &len,
                              0);
-
-	gtk_text_buffer_set_text(globals.output_text,contents,len);
-
-	if (!junk) {
-
+	if(junk) {
+		gtk_text_buffer_set_text(globals.output_text,contents,len);
 	}
 }
 
@@ -232,16 +229,6 @@ void eb_entry(GtkWidget *widget, gpointer data)
 
 }
 
-/*Handle Radio Buttons for and-or (only for "or" )*/
-void radioButtonsORAND(GtkWidget *widget, gpointer data){
-	if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))){
-		globals.search_type = S_SA;	
-		printf("Selected And\n");
-	} else {
-		globals.search_type = S_SO;
-		printf("Selected Or\n");
-	}
-}
 
 /* Handle Quit button click */
 void quit_click(GtkWidget *widget, gpointer data)
@@ -274,7 +261,6 @@ void help_click(GtkWidget *widget, gpointer data)
 	gchar *content_text = 
 		"*Main Screen\n"
 		"\tSearch Query Field Box for search query\n"
-		"\tOr/And radio buttons select search type\n"
 		"\tIndex output will go here\n"
 		"*Click File->\n"
 		"\t-Preferences to setup your search path\n"
@@ -413,33 +399,10 @@ GtkWidget *mk_main_window(void)
 	gtk_box_pack_start(GTK_BOX(vbox), entry_box, FALSE, FALSE, 2);
 	gtk_widget_show(entry_box);
 
-	/*       } */
-	/*       { hbox of radios */
-	GtkWidget *hbox = gtk_hbox_new(FALSE, 5);
-	/*          { radio1 */
-	GtkWidget *radio1 = 
-		gtk_radio_button_new_with_label(NULL,
-		"Logical Or");
-	gtk_box_pack_start(GTK_BOX(hbox),radio1, FALSE, FALSE, 5);
-	gtk_widget_show(radio1);
+	
 
-	/*          } */
-	/*          { radio2 */
- 	GtkWidget *radio2 = 
-		gtk_radio_button_new_with_label_from_widget(
-		GTK_RADIO_BUTTON(radio1),"Logical And");
-	gtk_box_pack_start(GTK_BOX(hbox),radio2, FALSE, FALSE, 10);
-	gtk_widget_show(radio2);
-	/*          } */
-
-	gtk_box_pack_start(
-		GTK_BOX(vbox), hbox,
-		FALSE, FALSE, 2);
-	gtk_widget_show(hbox);
 
 	
-	g_signal_connect(radio2, "clicked",
-			 G_CALLBACK(radioButtonsORAND), NULL);
 	
 	
 	/*       } */
@@ -487,13 +450,13 @@ GtkWidget *mk_main_window(void)
 int main(int argc, char **argv)
 {
 	gtk_init(&argc,&argv);
-
+	
 	/*initialized*/
 	globals.search_path=NULL;  //empty.
 	globals.auto_index=0;  //no auto index
 	globals.search_type = S_SO;//or
 	globals.progname = argv[0];
-
+	
 	read_prefs();	
 	
 	GtkWidget *main_window = mk_main_window();

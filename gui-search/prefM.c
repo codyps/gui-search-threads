@@ -19,7 +19,15 @@ void show_pref_dialog(GtkWidget *parent)
 	    
 	GtkWidget *pref_dia_vbox =
 		gtk_dialog_get_content_area(GTK_DIALOG(pref_dia));
-					    
+
+	//Thread entry text box
+	GtkWidget *thread_box = gtk_entry_new();
+	gtk_entry_set_text(GTK_ENTRY(thread_box),"How many Threads?");
+	gtk_box_pack_start(
+		GTK_BOX(pref_dia_vbox), thread_box, FALSE, FALSE, 2);
+	gtk_widget_show(thread_box);
+	
+			    
 	//text entry box for the preferences Dialog
 	GtkWidget *path_box = gtk_entry_new();
 	gtk_entry_set_text(GTK_ENTRY(path_box),globals.search_path);
@@ -46,8 +54,9 @@ PREF_AGAIN:
 		/*If invalid, ERROR dialog*/
 	
 		const gchar *new_path = gtk_entry_get_text(GTK_ENTRY(path_box));
+		int thread_num = atoi(gtk_entry_get_text(GTK_ENTRY(thread_box)));
+		printf("%d\n", thread_num);
 		
-
 		if ( !g_file_test(new_path,G_FILE_TEST_IS_DIR) ) {
 			GtkWidget *error_dia=gtk_message_dialog_new(
 					GTK_WINDOW(pref_dia),
@@ -59,12 +68,25 @@ PREF_AGAIN:
 			gtk_dialog_run(GTK_DIALOG(error_dia));
 			gtk_widget_destroy(error_dia);
 			goto PREF_AGAIN;
-
-			
 		}
+		else if(thread_num < 1)
+		{
+			GtkWidget *error_dia=gtk_message_dialog_new(
+					GTK_WINDOW(pref_dia),
+					GTK_DIALOG_DESTROY_WITH_PARENT,
+					GTK_MESSAGE_ERROR,
+					GTK_BUTTONS_OK,
+					"Invalid Thread Number"
+					);
+			gtk_dialog_run(GTK_DIALOG(error_dia));
+			gtk_widget_destroy(error_dia);
+			goto PREF_AGAIN;
+		}
+		
 		/*valid path*/
 		g_free(globals.search_path);
 		globals.search_path = g_strdup_printf("%s", new_path);
+		globals.thread_count = thread_num;
 		
 		g_print("New: %s\n",globals.search_path);
 
