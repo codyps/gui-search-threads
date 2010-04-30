@@ -1,0 +1,26 @@
+#!/bin/tcsh
+
+## Removes the given file from the index.
+
+if ( $# != 2 ) then
+	echo "usage: $0 <index_db> <filename>" >> /dev/stderr
+	exit 1
+endif
+
+set index_db = "$1"
+set filename = "$2" # needs to be cleaned of regex stuff.
+
+# clean filename of sed regex stuff
+set rfilename = `printf "%s" "$filename"\
+	| sed 's;\([][\^*.$]\);\\\1;g'\
+	| sed 's~^\./~~g' \
+	| sed 's~/~\\/~g' \
+	| sed 's/;/\\;/g'`
+
+# remove all mentions of the file from the index
+# $%name = number of characters in name.
+#echo "removing $filename ($rfilename)" >> /dev/stderr
+
+set remove = 's;[[:digit:]]\+#'"$rfilename"'#[[:digit:]]\+|;;g'
+
+sed "$remove" < "$index_db" > /dev/stdout

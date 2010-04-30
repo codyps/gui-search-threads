@@ -1,0 +1,53 @@
+#!/bin/tcsh
+
+## Merges lines with the same fileents 
+##  and eliminates keywords without fileents
+
+if ( $# != 1 ) then
+	printf "usage: %s <index_db>\n" "$0"
+	exit 1
+endif
+
+set index_db = $1
+
+set old_keyword = ""
+set old_fileents = ""
+
+set tmp_file = "/tmp/_merge-a-$$"
+set nonomatch
+
+foreach line ( ` cat "$index_db" ` )
+	set keyword = `echo "$line" | sed 's;^\([^@]\+\)@.*$;\1;'`
+	set fileents = `echo "$line" | sed 's;^[^@]\+@\(.*\)$;\1;'`
+
+	#echo "Keyword: $keyword"
+	#echo "Fileent: $fileents"
+
+	if ( "$keyword" == "$old_keyword" ) then
+		# Keyword still the same...
+		set old_fileents = "${old_fileents}${fileents}"
+		#printf "%s" "$fileents" >> "$tmp_file"
+	else
+		# Keyword has changed. YAY!
+
+		if ( "$old_fileents" != "" ) then
+			printf "%s@%s\n" "$old_keyword"\
+				"$old_fileents" >> "$tmp_file"
+		endif
+
+		set old_fileents = "$fileents"
+		set old_keyword = "$keyword"
+		
+	endif
+end
+
+if ( "$old_fileents" != "" ) then
+	printf "%s@%s\n" "$old_keyword"\
+		"$old_fileents" >> "$tmp_file"
+endif
+
+if ( -e "$tmp_file" ) then
+	cat "$tmp_file" >> /dev/stdout
+	rm "$tmp_file"
+endif
+

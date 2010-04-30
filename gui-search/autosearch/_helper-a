@@ -1,0 +1,36 @@
+#!/bin/tcsh
+
+# FIND helper script. Called upon each file.
+
+if ( $# != 4 ) then
+	echo "usage: $0 <indexer> <remove> <index_db> <filename>" >> /dev/stderr
+	exit 1
+endif
+
+set indexer  = "$1"
+set remove = "$2"
+set index_db = "$3"
+set filename = "$4"
+
+basename `printf "%s" "$filename"` | grep -q '^\.'
+
+if ( "$filename" == "./$index_db" || $? == 0 ) then
+	#echo "avoiding indexing the index '$filename' == './$index_db'" >> /dev/stderr
+	exit 0
+endif
+
+$remove "$index_db" "$filename" > "$index_db.rem"
+set remove_ret = $?
+
+if ($remove_ret) then
+	echo "removing '$filename' from index failed failed" >> /dev/stderr
+	rm "$index_db.rem"
+	exit 1
+else
+	# index the file, append to the already exsisting index
+	$indexer "/dev/stdout" "$filename" > "$index_db.reindex"
+	cat "$index_db.rem" "$index_db.reindex" > "$index_db"
+	rm "$index_db.rem" "$index_db.reindex"
+endif
+
+
