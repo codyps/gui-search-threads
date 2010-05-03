@@ -282,12 +282,13 @@ int SLIntersect(SortedListPtr d, const SortedListPtr s) {
 	pthread_rwlock_unlock(d->rwlock);
 
 	return 1;
-
 }
 
 
 SortedListPtr SLDup(SortedListPtr s) {
 	if (s) {
+		pthread_rwlock_rdlock(s->rwlock);
+
 		SortedListPtr n = malloc(sizeof(*n));
 		if (n) {
 			n->root = tree_dup(s->root);
@@ -297,6 +298,7 @@ SortedListPtr SLDup(SortedListPtr s) {
 			s->iter_ct = 0;
 			#endif
 		}
+		pthread_rwlock_unlock(s->rwlock);
 		return n;
 	} else {
 		return 0;
