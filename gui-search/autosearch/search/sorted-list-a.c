@@ -320,7 +320,7 @@ size_t SLGetCt(SortedListPtr list) {
 /* XXX: what should happen if another thread has open iterators? */
 int SLInsert(SortedListPtr list, void *newObj)
 {
-	pthread_rwlock_rdlock(list->rwlock);
+	pthread_rwlock_wrlock(list->rwlock);
 	int ret;
 	if (list->iter_ct)
 		return 0;
@@ -336,7 +336,7 @@ int SLInsert(SortedListPtr list, void *newObj)
 int SLRemove(SortedListPtr list, void *newObj)
 {
 	node_t *ret;
-	pthread_rwlock_rdlock(list->rwlock);
+	pthread_rwlock_wrlock(list->rwlock);
 	if (list->iter_ct)
 		return 0;
 	ret = delete_from_bst(&(list->root), newObj, list->cmp);
