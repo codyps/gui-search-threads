@@ -294,9 +294,11 @@ SortedListPtr SLDup(SortedListPtr s) {
 			n->root = tree_dup(s->root);
 			n->ct = s->ct;
 			n->cmp = s->cmp;
-			#ifndef REMOVE_SILLYNESS
-			s->iter_ct = 0;
-			#endif
+			n->iter_ct = 0;
+
+			pthread_rwlock_init(n->rwlock,NULL);
+			pthread_mutex_init(n->iter_lock,NULL);
+			pthread_cond_init(n->iter_signal,NULL);
 		}
 		pthread_rwlock_unlock(s->rwlock);
 		return n;
