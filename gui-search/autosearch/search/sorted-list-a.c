@@ -206,6 +206,30 @@ struct SortedListIterator {
 	SortedListPtr list;
 };
 
+SortedListPtr SLCreate(CompareFuncT cmp)
+{
+	SortedListPtr s = malloc(sizeof(*s));
+	if (s) {
+		s->root = NULL;
+		s->ct = 0;
+		s->cmp = cmp;
+		s->iter_ct = 0;
+		pthread_rwlock_init(s->rwlock,NULL);
+		pthread_cond_init(s->iter_signal,NULL);
+		pthread_mutex_init(s->iter_lock,NULL);
+
+	}
+	return s;
+}
+
+void SLDestroy(SortedListPtr list)
+{
+	pthread_cond_destroy(s->iter_signal);
+	pthread_mutex_destroy(s->iter_lock);
+	pthread_rwlock_destroy(s->rwlock);
+	freebst(list->root);
+	free(list);
+}
 
 int SLUnion(SortedListPtr d, const SortedListPtr s) {
 	/* 
@@ -216,7 +240,15 @@ int SLUnion(SortedListPtr d, const SortedListPtr s) {
 	}
 	return 0;
 	*/
+	pthread_rwlock_rdlock(s->rwlock);
+	pthread_rwlock_wrlock(d->rwlock);
+
 	tree_union(&(d->root),s->root,&(d->ct),d->cmp);
+	
+	pthread_rwlock_unlock(s->rwlock);
+	pthread_rwlock_unlock(d->rwlock);
+
+
 	return 1;
 }
 
@@ -246,6 +278,7 @@ int SLIntersect(SortedListPtr d, const SortedListPtr s) {
 
 }
 
+
 SortedListPtr SLDup(SortedListPtr s) {
 	if (s) {
 		SortedListPtr n = malloc(sizeof(*n));
@@ -264,45 +297,24 @@ SortedListPtr SLDup(SortedListPtr s) {
 }
 
 void *SLLookup(SortedListPtr s, void *data) {
-	return tree_lookup(s->root,data,s->cmp);
+	void *ret;
+	pthread_rwlock_rdlock(s->rwlock);
+	ret = tree_lookup(s->root,data,s->cmp);
+	pthread_rwlock_unlock(s->rwlock);
+	return ret;
 }
 
 size_t SLGetCt(SortedListPtr list) {
 	return list->ct;
 }
 
-SortedListPtr SLCreate(CompareFuncT cmp)
-{
-	SortedListPtr s = malloc(sizeof(*s));
-	if (s) {
-		s->root = NULL;
-		s->ct = 0;
-		s->cmp = cmp;
-		s->iter_ct = 0;
-		pthread_rwlock_init(s->rwlock,NULL);
-		pthread_cond_init(s->iter_signal,NULL);
-		pthread_mutex_init(s->iter_lock,NULL);
 
-	}
-	return s;
-}
-
-void SLDestroy(SortedListPtr list)
-{
-	pthread_cond_destroy(s->iter_signal);
-	pthread_mutex_destroy(s->iter_lock);
-	pthread_rwlock_destroy(s->rwlock);
-	freebst(list->root);
-	free(list);
-}
 
 int SLInsert(SortedListPtr list, void *newObj)
 {
 	int ret;
-	#ifndef REMOVE_SILLYNESS
 	if (list->iter_ct)
 		return 0;
-	#endif
 	ret = insert_into_bst(&(list->root), newObj, list->cmp);
 	if (ret)
 		list->ct++;
