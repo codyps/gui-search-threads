@@ -172,6 +172,20 @@ void tree_union(node_t **d, node_t *s, size_t *n, CompareFuncT cmp) {
 	}
 }
 
+void tree_intersect(node_t **d, node_t *sroot, size_t *n, CompareFuncT cmp) {
+	if (*d) {
+		if (!tree_lookup(sroot,(*d)->data,cmp)) {
+			delete_from_bst(d,(*d)->data,cmp);
+			(*n)--;
+			tree_intersect(d,sroot,n,cmp);
+		} else {
+			tree_intersect(&((*d)->left) ,sroot,n,cmp);
+			tree_intersect(&((*d)->right),sroot,n,cmp);
+		}
+	} 
+}
+
+
 /** sorted list interface **/
 struct SortedList {
 	struct bstnode *root;
@@ -181,7 +195,7 @@ struct SortedList {
 	pthread_rwlock_t rwlock;
 
 	pthread_mutex_t iter_lock;
-	pthread_mutex_t iter_signal;
+	pthread_cond_t iter_signal;
 	size_t iter_ct;
 };
 
@@ -204,19 +218,6 @@ int SLUnion(SortedListPtr d, const SortedListPtr s) {
 	*/
 	tree_union(&(d->root),s->root,&(d->ct),d->cmp);
 	return 1;
-}
-
-void tree_intersect(node_t **d, node_t *sroot, size_t *n, CompareFuncT cmp) {
-	if (*d) {
-		if (!tree_lookup(sroot,(*d)->data,cmp)) {
-			delete_from_bst(d,(*d)->data,cmp);
-			(*n)--;
-			tree_intersect(d,sroot,n,cmp);
-		} else {
-			tree_intersect(&((*d)->left) ,sroot,n,cmp);
-			tree_intersect(&((*d)->right),sroot,n,cmp);
-		}
-	} 
 }
 
 int SLIntersect(SortedListPtr d, const SortedListPtr s) {
@@ -277,18 +278,20 @@ SortedListPtr SLCreate(CompareFuncT cmp)
 		s->root = NULL;
 		s->ct = 0;
 		s->cmp = cmp;
-		#ifndef REMOVE_SILLYNESS
 		s->iter_ct = 0;
-		#endif
+		pthread_rwlock_init(s->rwlock,NULL);
+		pthread_cond_init(s->iter_signal,NULL);
+		pthread_mutex_init(s->iter_lock,NULL);
+
 	}
 	return s;
 }
 
 void SLDestroy(SortedListPtr list)
 {
-	#ifndef REMOVE_SILLYNESS
-	/* well, what if we destroy a list with iterators? HUH!?! */
-	#endif
+	pthread_cond_destroy(s->iter_signal);
+	pthread_mutex_destroy(s->iter_lock);
+	pthread_rwlock_destroy(s->rwlock);
 	freebst(list->root);
 	free(list);
 }
@@ -322,17 +325,13 @@ int SLRemove(SortedListPtr list, void *newObj)
 SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 {
 	SortedListIteratorPtr iter;
-	#ifndef REMOVE_SILLYNESS
 	list->iter_ct++;
-	#endif
 	iter = malloc(sizeof(*iter));
 	iter->len = list->ct;
 	iter->start = malloc(sizeof(void *) * iter->len);
 	iter->current = iter->start;
 
-	#ifndef REMOVE_SILLYNESS
 	iter->list = list;
-	#endif
 
 	/* Populate array */
 	tree_flatten(&(iter->current), list->root);
@@ -344,9 +343,7 @@ SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 void SLDestroyIterator(SortedListIteratorPtr iter)
 {
 	free(iter->start);
-	#ifndef REMOVE_SILLYNESS
 	iter->list->iter_ct--;
-	#endif
 	free(iter);
 }
 

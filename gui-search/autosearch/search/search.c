@@ -188,7 +188,6 @@ void worker_thread(void *data_v)
 {
 	struct thread_data *data = data_v;
 
-
 	
 	//XXX: for each of our word's files,
 	{
@@ -199,11 +198,8 @@ void worker_thread(void *data_v)
 			
 
 		}
-
 		//XXX: score(Q,F) should be calculated
 	}
-
-
 }
 
 
