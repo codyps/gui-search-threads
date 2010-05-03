@@ -317,35 +317,41 @@ size_t SLGetCt(SortedListPtr list) {
 	return list->ct;
 }
 
-
-
+/* XXX: what should happen if another thread has open iterators? */
 int SLInsert(SortedListPtr list, void *newObj)
 {
+	pthread_rwlock_rdlock(list->rwlock);
 	int ret;
 	if (list->iter_ct)
 		return 0;
 	ret = insert_into_bst(&(list->root), newObj, list->cmp);
 	if (ret)
 		list->ct++;
+
+	pthread_rwlock_unlock(list->rwlock);
 	return ret;
 }
 
+/* XXX: what should happen if another thread has open iterators? */
 int SLRemove(SortedListPtr list, void *newObj)
 {
 	node_t *ret;
-	#ifndef REMOVE_SILLYNESS
+	pthread_rwlock_rdlock(list->rwlock);
 	if (list->iter_ct)
 		return 0;
-	#endif
 	ret = delete_from_bst(&(list->root), newObj, list->cmp);
 	if (ret)
 		list->ct--;
+	pthread_rwlock_unlock(list->rwlock);
 	return !!ret;
 }
 
 SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 {
 	SortedListIteratorPtr iter;
+
+	pthread_rwlock_rdlock(list->rwlock);
+
 	list->iter_ct++;
 	iter = malloc(sizeof(*iter));
 	iter->len = list->ct;
@@ -357,6 +363,8 @@ SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 	/* Populate array */
 	tree_flatten(&(iter->current), list->root);
 	iter->current = iter->start;
+	
+	pthread_rwlock_unlock(list->rwlock);
 
 	return iter;
 }
