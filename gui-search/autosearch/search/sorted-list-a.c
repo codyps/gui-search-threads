@@ -248,7 +248,6 @@ int SLUnion(SortedListPtr d, const SortedListPtr s) {
 	pthread_rwlock_unlock(s->rwlock);
 	pthread_rwlock_unlock(d->rwlock);
 
-
 	return 1;
 }
 
@@ -273,7 +272,15 @@ int SLIntersect(SortedListPtr d, const SortedListPtr s) {
 	}
 	return 0;
 	*/
+
+	pthread_rwlock_rdlock(s->rwlock);
+	pthread_rwlock_wrlock(d->rwlock);
+	
 	tree_intersect(&(d->root),s->root,&(d->ct),d->cmp);
+
+	pthread_rwlock_unlock(s->rwlock);
+	pthread_rwlock_unlock(d->rwlock);
+
 	return 1;
 
 }
