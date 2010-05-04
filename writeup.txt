@@ -13,11 +13,11 @@ selects an appropriate thread number.  The thread number is then added to the
 global struct containing the information needed for autoindexing and
 searching.
 
-	The search function call was also altered in such a way as to pass in 
+	The search function call was also altered in such a way as to pass in
 an extra argument into the autosearch.  The extra argument is from the global
 struct, it is the thread number.
 
-	The gui interface was also simplified to reflect the new search 
+	The gui interface was also simplified to reflect the new search
 parameters. The Radio buttons used to select whether to search using logical
 and or logical or were removed.  This is done because the threaded search tool
 is only to work with logical or queries.
@@ -32,7 +32,22 @@ reflect the new minimum of arguments for autosearch to run.
 
 search:
 
-The formula for computing the file score had multiple variables.  The two most difficult variables to find were |F|, the total number of terms in the file and N, the total number of files.  Both of these variables were computed using a single string of union operations. The first step was to get the sorted list of the inverted index.  This sorted list contains all the terms in the index file. Each term also has a sorted list attached to it populated with the file names associated with the term.  Along with the file name is the amount of times the term appears in that particular file.  Using this sorted list N and |F| are computed.  Each sorted list associated with the term in the query is merged together into a new sorted list.  This allows two operations to occur.  The total number of terms in the file is now in the resulting list.  When merging the lists the node containing the file count is updated with the other lists file count, resulting in the overall number of terms per file.
+	The formula for computing the file score had multiple variables.  The
+two most difficult variables to find were |F|, the total number of terms in
+the file and N, the total number of files.  Both of these variables were
+computed using a single string of union operations. The first step was to get
+the sorted list of the inverted index.  This sorted list contains all the
+terms in the index file. Each term also has a sorted list attached to it
+populated with the file names associated with the term.  Along with the file
+name is the amount of times the term appears in that particular file.  Using
+this sorted list N and |F| are computed.  Each sorted list associated with the
+term in the query is merged together into a new sorted list.  This allows two
+operations to occur.  The total number of terms in the file is now in the
+resulting list.  When merging the lists the node containing the file count is
+updated with the other lists file count, resulting in the overall number of
+terms per file. The N is simply the number of entries the union of all
+keyword's fileent lists, thus the number of entries in the same union which
+was computed to calculate the values of |F|.
 
 
 sorted list: 
@@ -51,33 +66,32 @@ is handled by the very useful rwlock.
 
 threadpool: 
 
-	In order to design a dispatching threadpool, threads needed to be
-able to wait on work items to becom avaliable, and not more than one should
-attempt to grab a work unit at any one time. We realized that keeping track of
-the threads avaliable and dispatching data to them individually as we would
-need to search through every exsisting thread to locate a possibly non-busy
-one.  Instead, we had each of the threads "queue up" on a single mutex,
-waiting for the dispatcher to place a work item out for them to take. To
-ensure that only one worker could grab a work item at once, the workers all
-attemt to grab a "work lock", which enables them to obtain work. The worker
-threads then wait for the address of a new work unit by checking if a variable
-in the threadpool data structure (a pointer to which the threads are provided
-with). This variable is obvoiusly locked with another mutex, in this case the
-"address valid" lock (with a paired condition variable). Dispatch sets this
-address and signals the waiting thread. Dispatch then waits for the thread to
-become NULL, indicating that the job has been taken (a second mutex, the
-"address null" mutex, and a paired condition variable are utilized). Upon
-discovering a valid address, the worker thread copies it, unlocks the address
-valid lock, locks the address null lock, clears the work unit, unlocks the
-address null lock, and signals (via the condition variable) that the work has
-been taken. It then unlocks the work lock (allowing another thread to obtain
-work), and executes the work unit. Following execution of the work unit, the
-process repeates.  
+	In order to design a dispatching threadpool, threads needed to be able
+to wait on work items to becom avaliable, and not more than one should attempt
+to grab a work unit at any one time. We realized that keeping track of the
+threads avaliable and dispatching data to them individually as we would need
+to search through every exsisting thread to locate a possibly non-busy one.
+Instead, we had each of the threads "queue up" on a single mutex, waiting for
+the dispatcher to place a work item out for them to take. To ensure that only
+one worker could grab a work item at once, the workers all attemt to grab a
+"work lock", which enables them to obtain work. The worker threads then wait
+for the address of a new work unit by checking if a variable in the threadpool
+data structure (a pointer to which the threads are provided with). This
+variable is obvoiusly locked with another mutex, in this case the "address
+valid" lock (with a paired condition variable). Dispatch sets this address and
+signals the waiting thread. Dispatch then waits for the thread to become NULL,
+indicating that the job has been taken (a second mutex, the "address null"
+mutex, and a paired condition variable are utilized). Upon discovering a valid
+address, the worker thread copies it, unlocks the address valid lock, locks
+the address null lock, clears the work unit, unlocks the address null lock,
+and signals (via the condition variable) that the work has been taken. It then
+unlocks the work lock (allowing another thread to obtain work), and executes
+the work unit. Following execution of the work unit, the process repeates.  
 
-	To destroy the threadpool without interrupting possibly
-running threads, the threads are killed by dispatching (via the standard
-dispatch function) the pthread_exit function as a work unit. We send out a
-number of work unit pthread_exits equal to the number of threads created.
-Because dispatch blocks until the work unit has been taken, after the loop
-dispatching pthread exit concludes, all the threads have been terminated.
+	To destroy the threadpool without interrupting possibly running
+threads, the threads are killed by dispatching (via the standard dispatch
+function) the pthread_exit function as a work unit. We send out a number of
+work unit pthread_exits equal to the number of threads created.  Because
+dispatch blocks until the work unit has been taken, after the loop dispatching
+pthread exit concludes, all the threads have been terminated.
 
