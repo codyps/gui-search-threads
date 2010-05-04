@@ -6,12 +6,16 @@
  * a = b -> = 0
  */
 typedef int (*CompareFuncT) (void *a, void *b);
+typedef void (*UninoFuncT) (void *d, void *s); /* destination <- source */
+
 typedef struct SortedList *SortedListPtr;
 typedef struct SortedListIterator *SortedListIteratorPtr;
 
 SortedListPtr SLCreate(CompareFuncT cf);
 SortedListPtr SLDup(SortedListPtr s);
 int SLUnion(SortedListPtr d, const SortedListPtr s);
+int SLUnionSmart(SortedListPtr d, const SortedListPtr s, UnionFuncT uf);
+
 int SLIntersect(SortedListPtr d, const SortedListPtr s);
 void *SLLookup(SortedListPtr s, void *data);
 void SLDestroy(SortedListPtr list);

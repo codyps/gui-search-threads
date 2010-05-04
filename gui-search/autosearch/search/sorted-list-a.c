@@ -24,6 +24,26 @@ node_t *mk_node(void *data)
 	return n;
 }
 
+int insert_into_bst_smart(node_t **root, void *data,
+		     CompareFuncT comparator, UnionFuncT uf)
+{
+	node_t **current = root;
+	int compare;
+	while (*current != NULL) {
+		compare = comparator((*current)->data, data);
+		if ( compare > 0 )
+			current = &((*current)->right);
+		else if ( compare < 0)
+			current = &((*current)->left);
+		else {
+			uf( (*current)->data, data );
+			return 0;
+		}
+	}
+	*current = mk_node(data);
+	return (*current ? 1 : 0);
+}
+
 int insert_into_bst(node_t **root, void *data,
 		     CompareFuncT comparator)
 {
@@ -163,6 +183,15 @@ node_t *tree_dup(const node_t *t) {
 	}
 }
 
+void tree_union_smart(node_t **d, node_t *s, size_t *n, CompareFuncT cmp, UnionFuncT uf) {
+	if (s) {
+		if (insert_into_bst_smart(d,s->data,cmp,uf))
+			(*n)++;
+		tree_union(d,s->left,n,cmp,uf);
+		tree_union(d,s->right,n,cmp,uf);
+	}
+}
+
 void tree_union(node_t **d, node_t *s, size_t *n, CompareFuncT cmp) {
 	if (s) {
 		if (insert_into_bst(d,s->data,cmp))
@@ -222,6 +251,20 @@ void SLDestroy(SortedListPtr list)
 	pthread_rwlock_destroy(s->rwlock);
 	freebst(list->root);
 	free(list);
+}
+
+
+int SLUnionSmart(SortedListPtr d, const SortedListPtr s, UnionFuncT uf) {
+
+	pthread_rwlock_rdlock(s->rwlock);
+	pthread_rwlock_wrlock(d->rwlock);
+
+	tree_union_smart(&(d->root),s->root,&(d->ct),d->cmp,uf);
+	
+	pthread_rwlock_unlock(s->rwlock);
+	pthread_rwlock_unlock(d->rwlock);
+
+	return 1;
 }
 
 int SLUnion(SortedListPtr d, const SortedListPtr s) {

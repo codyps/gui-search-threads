@@ -172,6 +172,15 @@ struct thread_data {
 	struct query_data *q_data;
 };
 
+
+/* we can get N by unioning all the keyword's fileent trees together,
+ * and then using SLGetCt on the result
+ */
+
+/*
+ *
+ */
+
 /* TODO: 
  * this function: 
  * 	score(Q,F) = sum( log( 1 + N / Nt ) * ( 1 + log(Ft) ) ) / sqrt(|F|);
@@ -234,7 +243,6 @@ void worker_thread(void *data_v)
 		//XXX: score(Q,F) should be calculated
 	}
 }
-
 
 static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count) {
 	SortedListPtr fileents;
