@@ -13,15 +13,16 @@ if ( "$ver" == "" ) then
 #	exit 1
 endif
 
-if ( $# != 2 ) then
-	echo "usage: $0 <directory name> <auto-index:{0,1}>" > /dev/stderr
+if ( $# != 3 ) then
+	echo "usage: $0 <directory name> <auto-index:{0,1}> <thread number>" > /dev/stderr
 	exit 1
 endif
 
-#set vet = "a
 
+set thread_number = "$3"
 set auto_index = "$2"
 set search_dir = `echo "$1" | sed 's#/*$##' `
+set ver = "a"
 set db_name = ".searchdb-$ver"
 set index_db = "$search_dir/$db_name"
 set indexer = "$abs_exe_dir/indexer-$ver/indexer"
@@ -82,4 +83,4 @@ else
 	(cd "$search_dir"; $indexer "$db_name" ".")
 endif
 
-exec "$search" "$index_db" 
+exec "$search" "$index_db" "$thread_number"
