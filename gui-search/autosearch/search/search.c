@@ -154,9 +154,10 @@ int cmp_score_by_score(void *a_, void *b_)
 {
 	struct score *a = a_, *b = b_;
 
-	long double x = a->score - b->score;
-	if (x != 0) {
-		return x;
+	if (a->score > b->score) {
+		return 1;
+	} else if (b->score > a->score) {
+		return -1;
 	} else {
 		return cmp_score_by_filename(a_,b_);
 	}
@@ -327,9 +328,11 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 		SortedListIteratorPtr sort_iter = SLCreateIterator(q_data.scores);
 		if (sort_iter) {
 			SortedListPtr scores_sorted = SLCreate(cmp_score_by_score);
-			struct score *s;
-			while(( s = SLNextItem(sort_iter) )) {
-				SLInsert(scores_sorted,s);
+			struct score *s1;
+			while(( s1 = SLNextItem(sort_iter) )) {
+				INFO("inserted %s in sorted scores", s1->filename);
+				int ret = SLInsert(scores_sorted,s1);
+				INFO("SLInsert returned %d",ret);
 			}
 			SLDestroyIterator(sort_iter);
 			SLDestroy(q_data.scores);
@@ -338,6 +341,10 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 			SortedListIteratorPtr iter = SLCreateIterator(scores_sorted);
 			if (iter) {
 				struct score *s2;
+				while(( s2 = SLNextItem(iter) )) {
+					fprintf(stdout,"%s (%LF)\n",s2->filename,s2->score);
+				}
+				/*
 				s2 = SLNextItem(iter);
 				if (s2) {
 					// print the first term.
@@ -350,6 +357,7 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 					}
 					fputs(".\n",stdout);
 				}
+				*/
 				SLDestroyIterator(iter);
 			}
 			SLDestroy(scores_sorted);
