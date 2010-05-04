@@ -20,6 +20,46 @@ autosearch:
 search:
 
 
-threadpool:
 
+sorted list:
+	To make the sorted list thread safe, a single readers-writer lock
+(pthread_rwlock) was utilized. A readers-writer lock allows multiple readers
+to be reading, but only a single writer is allowed, while no readers are
+present. Because many functions that operate on the SortedList only invlove
+reading data, this allowed us to prevent serialization of the workload that
+might result from the utilization of a mutex/condition variable. With one
+exception, mutexes are locked at the beginning of SL functions as needed, and
+unlocked at their conclution. This one exception is the SL Iterators. These
+obtain a read lock on their creation, and unlock it on destruction, making the
+old style tracking of current iterators unneeded. All of their functionallity
+is handled by the very useful rwlock.
+
+threadpool:
+	In order to design a dispatching threadpool, threads needed to be able
+to wait on work items to becom avaliable, and not more than one should attempt
+to grab a work unit at any one time. We realized that keeping track of the
+threads avaliable and dispatching data to them individually as we would need
+to search through every exsisting thread to locate a possibly non-busy one.
+Instead, we had each of the threads "queue up" on a single mutex, waiting for
+the dispatcher to place a work item out for them to take. To ensure that only
+one worker could grab a work item at once, the workers all attemt to grab a
+"work lock", which enables them to obtain work. The worker threads then wait
+for the address of a new work unit by checking if a variable in the threadpool
+data structure (a pointer to which the threads are provided with). This
+variable is obvoiusly locked with another mutex, in this case the "address
+valid" lock (with a paired condition variable). Dispatch sets this address and
+signals the waiting thread. Dispatch then waits for the thread to become NULL,
+indicating that the job has been taken (a second mutex, the "address null"
+mutex, and a paired condition variable are utilized). Upon discovering a valid
+address, the worker thread copies it, unlocks the address valid lock, locks
+the address null lock, clears the work unit, unlocks the address null lock,
+and signals (via the condition variable) that the work has been taken. It then
+unlocks the work lock (allowing another thread to obtain work), and executes
+the work unit. Following execution of the work unit, the process repeates.
+	To destroy the threadpool without interrupting possibly running
+threads, the threads are killed by dispatching (via the standard dispatch
+function) the pthread_exit function as a work unit. We send out a number of
+work unit pthread_exits equal to the number of threads created. Because
+dispatch blocks until the work unit has been taken, after the loop dispatching
+pthread exit concludes, all the threads have been terminated.
 
