@@ -32,6 +32,7 @@ reflect the new minimum of arguments for autosearch to run.
 
 search:
 
+The formula for computing the file score had multiple variables.  The two most difficult variables to find were |F|, the total number of terms in the file and N, the total number of files.  Both of these variables were computed using a single string of union operations. The first step was to get the sorted list of the inverted index.  This sorted list contains all the terms in the index file. Each term also has a sorted list attached to it populated with the file names associated with the term.  Along with the file name is the amount of times the term appears in that particular file.  Using this sorted list N and |F| are computed.  Each sorted list associated with the term in the query is merged together into a new sorted list.  This allows two operations to occur.  The total number of terms in the file is now in the resulting list.  When merging the lists the node containing the file count is updated with the other lists file count, resulting in the overall number of terms per file.
 
 
 sorted list: 
