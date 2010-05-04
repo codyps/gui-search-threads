@@ -194,8 +194,6 @@ struct SortedList {
 
 	pthread_rwlock_t rwlock;
 
-	pthread_mutex_t iter_lock;
-	pthread_cond_t iter_signal;
 	size_t iter_ct;
 };
 
@@ -215,17 +213,12 @@ SortedListPtr SLCreate(CompareFuncT cmp)
 		s->cmp = cmp;
 		s->iter_ct = 0;
 		pthread_rwlock_init(s->rwlock,NULL);
-		pthread_cond_init(s->iter_signal,NULL);
-		pthread_mutex_init(s->iter_lock,NULL);
-
 	}
 	return s;
 }
 
 void SLDestroy(SortedListPtr list)
 {
-	pthread_cond_destroy(s->iter_signal);
-	pthread_mutex_destroy(s->iter_lock);
 	pthread_rwlock_destroy(s->rwlock);
 	freebst(list->root);
 	free(list);
@@ -297,8 +290,6 @@ SortedListPtr SLDup(SortedListPtr s) {
 			n->iter_ct = 0;
 
 			pthread_rwlock_init(n->rwlock,NULL);
-			pthread_mutex_init(n->iter_lock,NULL);
-			pthread_cond_init(n->iter_signal,NULL);
 		}
 		pthread_rwlock_unlock(s->rwlock);
 		return n;
@@ -316,16 +307,19 @@ void *SLLookup(SortedListPtr s, void *data) {
 }
 
 size_t SLGetCt(SortedListPtr list) {
-	return list->ct;
+	size_t ret;
+	pthread_rwlock_rdlock(s->rwlock);
+	ret = list->ct;
+	pthread_rwlock_unlock(s->rwlock);
+	return ret;
 }
 
 /* XXX: what should happen if another thread has open iterators? */
 int SLInsert(SortedListPtr list, void *newObj)
 {
-	pthread_rwlock_wrlock(list->rwlock);
+	pthread_rwlock_wrlock(&list->rwlock);
 	int ret;
-	if (list->iter_ct)
-		return 0;
+	
 	ret = insert_into_bst(&(list->root), newObj, list->cmp);
 	if (ret)
 		list->ct++;
@@ -339,8 +333,6 @@ int SLRemove(SortedListPtr list, void *newObj)
 {
 	node_t *ret;
 	pthread_rwlock_wrlock(list->rwlock);
-	if (list->iter_ct)
-		return 0;
 	ret = delete_from_bst(&(list->root), newObj, list->cmp);
 	if (ret)
 		list->ct--;
@@ -366,7 +358,6 @@ SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 	tree_flatten(&(iter->current), list->root);
 	iter->current = iter->start;
 	
-	pthread_rwlock_unlock(list->rwlock);
 
 	return iter;
 }
@@ -374,7 +365,11 @@ SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 void SLDestroyIterator(SortedListIteratorPtr iter)
 {
 	free(iter->start);
+	pthread_rwlock_unlock(list->rwlock);
+	pthread_rwlock_rwlock(list->rwlock);
 	iter->list->iter_ct--;
+
+	pthread_rwlock_unlock(list->rwlock);
 	free(iter);
 }
 
