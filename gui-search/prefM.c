@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include <stdlib.h>
 #include "global.h"
 #include "save.h"
 
@@ -22,7 +23,7 @@ void show_pref_dialog(GtkWidget *parent)
 
 	//Thread entry text box
 	GtkWidget *thread_box = gtk_entry_new();
-	gtk_entry_set_text(GTK_ENTRY(thread_box),"How many Threads?");
+	gtk_entry_set_text(GTK_ENTRY(thread_box),"%s",globals.thread_count);
 	gtk_box_pack_start(
 		GTK_BOX(pref_dia_vbox), thread_box, FALSE, FALSE, 2);
 	gtk_widget_show(thread_box);
