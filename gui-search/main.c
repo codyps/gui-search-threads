@@ -456,6 +456,7 @@ int main(int argc, char **argv)
 	globals.auto_index=0;  //no auto index
 	globals.search_type = S_SO;//or
 	globals.progname = argv[0];
+	globals.thread_count = 1;
 	
 	read_prefs();	
 	

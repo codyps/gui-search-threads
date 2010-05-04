@@ -23,13 +23,13 @@ set thread_number = "$3"
 set auto_index = "$2"
 set search_dir = `echo "$1" | sed 's#/*$##' `
 set ver = "a"
-set db_name = ".searchdb-$ver"
+set db_name = ".searchdb"
 set index_db = "$search_dir/$db_name"
-set indexer = "$abs_exe_dir/indexer-$ver/indexer"
-set helper = "$abs_exe_dir/_helper-$ver"
-set remove = "$abs_exe_dir/_remove-$ver"
-set merge = "$abs_exe_dir/_merge-$ver"
-set search = "$abs_exe_dir/search-$ver/search"
+set indexer = "$abs_exe_dir/indexer/indexer"
+set helper = "$abs_exe_dir/_helper"
+set remove = "$abs_exe_dir/_remove"
+set merge = "$abs_exe_dir/_merge"
+set search = "$abs_exe_dir/search/search"
 
 
 if ( ! -d "$search_dir" ) then 

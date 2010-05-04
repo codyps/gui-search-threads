@@ -11,5 +11,5 @@ const gchar config_key_path[] = "path";
 
 const char config_path[] = ".gui-prefs-CSBG";
 
-const char script_loc[] = "autosearch/autosearch-a";
+const char script_loc[] = "autosearch/autosearch";
 
