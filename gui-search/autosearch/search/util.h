@@ -18,6 +18,7 @@ typedef struct {
 keyword_t *mk_keyword(char *word);
 fileent_t *mk_fileent(char *filename, unsigned long ct);
 
+void merge_fileent(void *dv, void *sv);
 int cmp_keyword(void *p1, void *p2);
 int cmp_fileent_by_filename(void *p1, void *p2);
 char *memdup(const char *old, size_t len);

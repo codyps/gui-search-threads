@@ -63,6 +63,15 @@ int cmp_fileent_by_filename(void *p1, void *p2)
         return ret;
 }
 
+void merge_fileent(void *dv, void *sv)
+{
+	fileent_t *d = dv, *s = sv;
+
+	d->ct += s->ct;
+	
+
+}
+
 int cmp_keyword(void *p1, void *p2)
 {
         keyword_t *k1 = p1;

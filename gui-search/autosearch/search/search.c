@@ -160,9 +160,11 @@ int cmp_score_by_score(void *a_, void *b_)
 /* Data specific to a given query from the user */
 struct query_data {
 	SortedListPtr /* of score */ scores; /* sorted by filename */
+	SortedListPtr /* of fileents */ fileents; /* ALL fileents */
 	
 	keyword_t **words;	
 	size_t word_ct; /* the n */
+
 };
 
 /* Data given to a specific thread */
@@ -185,7 +187,7 @@ struct thread_data {
  * this function: 
  * 	score(Q,F) = sum( log( 1 + N / Nt ) * ( 1 + log(Ft) ) ) / sqrt(|F|);
  *	Ft = fileent's frequency (for term t)
- *	Nt = number of fileents in a keyword_t
+	 *	Nt = number of fileents in a keyword_t
  *	N = total number of files
  *	|F| = total number of terms in the file.
  *	n = number of terms
@@ -232,15 +234,23 @@ void worker_thread(void *data_v)
 					continue;
 
 				long double Ft = our_file_in_term->ct;
-				/* XXX: Need N */
+				long double N = SLGetCt(data->q_data->fileents);
 				long double score = log( 1 + N / Nt) * ( 1 + log( Ft ) );
 				
 				curr_file_score->score += score;
 		}
 
-		/* XXX: Need |F| */
+		/* Need |F| */
+		fileent_t file_abs_f = SLLookup(data->q_data->fileents,our_curr_file);
+		if (!file_abs_f) {
+			/*XXX: error */
+		}
 
-		//XXX: score(Q,F) should be calculated
+		long double abs_F = file_abs_f->ct;
+		
+		curr_file_score->score /= sqrt(abs_F);
+
+		// score(Q,F) should be calculated. yay.
 	}
 }
 
@@ -250,14 +260,21 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 	keyword_t **words;
 	size_t words_ct = 0;
 	size_t i = 0;
+
+	fileents = SLCreate(cmp_fileent_by_filename);
 	for( i = 0; i < argc; i++) {
 		k = bsearch( argv[i], keywords, n_keywords, sizeof(*keywords), cmp_lookup_keyword); 
 		
 		if (k) {
+			/* Place the terms into the word array, used for dispatching the query later */
 			words_ct++;
 			words = realloc(words, words_ct * sizeof(*words));
 
 			words[words_ct-1] = k;
+
+			/* Create the SortedList of all fileents */
+			SLUnionSmart(fileents,k->fileents,merge_fileent);
+			
 		}
 	}
 
@@ -267,7 +284,7 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 		q_data.words = words;
 		q_data.words_ct = words_ct;
 		q_data.scores = SLCreate(cmp_score_by_filename);
-
+		q_data.fileents = fileents;
 
 		//create the threadpool
 		threadpool tp = create_thread(thread_count);
@@ -302,7 +319,6 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 			}
 			SLDestroyIterator(sort_iter);
 			SLDestroy(q_data.scores);
-
 
 			// print them in order of scoring.
 			SortedListIteratorPtr iter = SLCreateIterator(scores_sorted);
