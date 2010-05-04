@@ -132,7 +132,7 @@ static int cmp_lookup_keyword( const void *key, const void *elem ) {
 
 	return strcmp(str,(*keyword)->word);
 }
-
+/* Contains the final score data */
 struct score {
 	char *filename;
 	long double score;
@@ -157,15 +157,15 @@ int cmp_score_by_score(void *a_, void *b_)
 	}
 }
 
-
-
+/* Data specific to a given query from the user */
 struct query_data {
 	SortedListPtr /* of score */ scores; /* sorted by filename */
 	
 	keyword_t **words;	
-	size_t word_ct;
+	size_t word_ct; /* the n */
 };
 
+/* Data given to a specific thread */
 struct thread_data {
 	size_t word_i; // the one it is responsible for.
 
@@ -181,23 +181,56 @@ struct thread_data {
  *	|F| = total number of terms in the file.
  *	n = number of terms
  *
- * make sorted list threadsafe.
  */
 
 void worker_thread(void *data_v)
 {
 	struct thread_data *data = data_v;
+	size_t our_word_i = data->word_i;
+	keyword_t *our_word = data->q_data->words[our_word_i];
+	SortedListPtr scores = data->q_data->scores;
 
-	
-	//XXX: for each of our word's files,
-	{
-		//XXX: create a skeleton struct for score with the value set to 0.
-	
-		//XXX: for each of the terms/words
-		{
-			
+	SortedListIteratorPtr our_files = SLCreateIterator(our_word->fileents);
+	fileent_t *our_curr_file;
 
+	// for each of our word's files,
+	while (our_curr_file = SLNextItem(our_files)) {
+		// create a skeleton struct for score with the value set to 0.
+		struct score *curr_file_score = malloc(sizeof(*curr_file_score));
+		if (!curr_file_score) {
+			/* XXX: error */
 		}
+		curr_file_score->filename = our_curr_file->filename;
+		curr_file_score->score = 0;
+
+		if (!SLInsert(scores,&curr_file_score)) {
+			/* Someone is already at work. */
+			continue;
+		}
+	
+		/* We are now responsible for this file */	
+		long double Nt = SLGetCt(our_word->fileents);
+			
+		// for each term in the query.
+		size_t i;
+		for(i = 0; i < data->q_data->word_ct; i++) {
+				keyword_t *curr_term = data->q_data->words[i];
+				fileent_t our_file_in_term;
+				our_file_in_term = SLLookup(curr_term->fileent,our_curr_file);
+
+				// if our_file is not in this term,
+				if (our_file_in_term == NULL)
+					continue;
+
+				long double Ft = our_file_in_term->ct;
+				/* XXX: Need N */
+				long double score = log( 1 + N / Nt) * ( 1 + log( Ft ) );
+				
+				curr_file_score->score += score;
+		}
+
+		/* XXX: Need |F| */
+
 		//XXX: score(Q,F) should be calculated
 	}
 }

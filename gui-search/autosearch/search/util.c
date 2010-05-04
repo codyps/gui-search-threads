@@ -51,7 +51,6 @@ ssize_t pgetdelim(char **lineptr, size_t *n, int delim, FILE *stream) {
         return ct;
 }
 
-
 int cmp_fileent_by_filename(void *p1, void *p2)
 {
 	if (!p1 || !p2) {
