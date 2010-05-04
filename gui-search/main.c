@@ -100,7 +100,7 @@ void do_search(const char *search_str) {
 	char *t_path = g_strdup_printf("%s",path);
 	char *t_other = g_strdup_printf("%s",other);
 
-	char *script = g_strdup_printf("%s/%s \"%s\" %s > .tmp_stuff",prog_path,rel_script,t_path,t_other);
+	char *script = g_strdup_printf("%s/%s \"%s\" %s %d > .tmp_stuff",prog_path,rel_script,t_path,t_other, globals.thread_count);
 
 
 	FILE *in = popen(script,"w");

@@ -76,7 +76,7 @@ void error_at_line(int status, int errnum, const char *filename, unsigned int li
 		exit(status);
 }
 
-static int look(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords) {
+static int look(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count) {
 	printf("argc: %d n_keywords: %d\n",argc, n_keywords);
 	size_t i,j;
 	for ( i = 0; i < argc; i++) {
@@ -117,7 +117,7 @@ void sl_look_p(SortedListPtr s, char *str) {
 		puts("(null)");
 }
 
-static int testlookup(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords) {
+static int testlookup(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count) {
 	SortedListPtr s = SLCreate(cmp_str);
 	sl_ins_p(s,"hola");
 	sl_ins_p(s,"goodbye");
@@ -203,7 +203,7 @@ void worker_thread(void *data_v)
 }
 
 
-static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords) {
+static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count) {
 	SortedListPtr fileents;
 	keyword_t **k;
 	keyword_t **words;
@@ -228,8 +228,8 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords)
 		q_data.scores = SLCreate(cmp_score_by_filename);
 
 
-		// XXX: create the threadpool
-		threadpool tp = create_thread(/* XXX: ct? */);
+		//create the threadpool
+		threadpool tp = create_thread(thread_count);
 
 		// allocate thread data.
 		struct thread_data *t_datas = malloc(sizeof(*t_datas) * words_ct);
@@ -239,7 +239,7 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords)
 			t_datas[i].word_i = i;
 
 			// dispatch work to thread.
-			dispatch(/*XXX: */ tp, workerthread, &t_datas[i]);
+			dispatch(tp, workerthread, &t_datas[i]);
 		}
 
 		// wait for all threads to complete.
@@ -309,7 +309,7 @@ static char **tok2arg(size_t *n, TokenizerT tk) {
 	return args;
 }
 
-int q(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords) {
+int q(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count) {
 	exit(EXIT_SUCCESS);
 }
 
