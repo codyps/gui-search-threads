@@ -83,7 +83,8 @@ void destroy_threadpool(threadpool tp_v)
 {
 	tpool_t *tp = tp_v;
 	
-	{
+	printf("thread_ct : %d\n",tp->thread_ct);
+	{	
 		int i;
 		for( i = 0; i < tp->thread_ct; i++ ) {
 			dispatch(tp_v,pthread_exit,NULL);

@@ -259,7 +259,7 @@ void worker_thread(void *data_v)
 static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count) {
 	SortedListPtr fileents;
 	keyword_t **k;
-	keyword_t **words;
+	keyword_t **words = 0;
 	size_t words_ct = 0;
 	size_t i = 0;
 
