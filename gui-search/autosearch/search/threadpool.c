@@ -53,8 +53,8 @@ void *wait_for_work(void *targ_v)
 
 		pthread_mutex_lock(&tp->addr_null_lock);
 		tp->new_fn = NULL;
-		pthread_mutex_unlock(&tp->addr_null_lock);
 		pthread_cond_signal(&tp->addr_null_signal);
+		pthread_mutex_unlock(&tp->addr_null_lock);
 
 		pthread_mutex_unlock(&tp->addr_valid_lock);
 		pthread_mutex_unlock(&tp->work_lock);
@@ -78,11 +78,12 @@ void dispatch(threadpool tp_v, dispatch_fn func, void *func_arg)
 	INFO("aquired addr_valid_lock");
 	tp->new_fn = func;
 	tp->new_fn_arg = func_arg;
-	pthread_mutex_unlock(&tp->addr_valid_lock);
-
+	
 	INFO("signalling that work is ready");
 	pthread_cond_signal(&tp->addr_valid_signal);
 	
+	pthread_mutex_unlock(&tp->addr_valid_lock);
+
 
 	/* wait for work to start */
 	pthread_mutex_lock(&tp->addr_null_lock);
@@ -204,6 +205,7 @@ threadpool create_threadpool(int nth)
 		if (ret != 0) {
 			WARN(1,ret,"pthread create %d of %d failed",i,nth);
 		}
+		pthread_detach(tp->targs[i].id);
 	}
 	return tp;
 }
