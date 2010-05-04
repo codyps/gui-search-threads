@@ -4,10 +4,19 @@
 #include "threadpool.h"
 #include "errors.h"
 
-typedef struct tpool_s {
+int debug = 1;
+
+typedef struct tpool_s tpool_t;
+
+struct thread_arg {
+	pthread_t id;	
+	tpool_t *tp;
+};
+
+struct tpool_s {
 	int thread_ct;
 
-	//pthread_mutex_t work_lock; // k
+	pthread_mutex_t work_lock; // k
 
 	pthread_mutex_t addr_valid_lock; // m
 	pthread_cond_t  addr_valid_signal; // x
@@ -18,20 +27,22 @@ typedef struct tpool_s {
 	dispatch_fn new_fn; // addr
 	void *new_fn_arg;
 
-} tpool_t;
+	struct thread_arg *targs;
 
-void *wait_for_work(void *tp_v)
+};
+
+void *wait_for_work(void *targ_v)
 {
-	tpool_t *tp = tp_v;
+	struct thread_arg *targ = targ_v;
+	tpool_t *tp = targ->tp;
 
 	for(;;) {
 		
 		/* aquire M  & K */
-		//pthread_mutex_lock(&tp->work_lock);
-		//INFO("aquired work_lock");
+		pthread_mutex_lock(&tp->work_lock);
+		INFO("th %d: aquired work_lock",(int)targ->id);
 		pthread_mutex_lock(&tp->addr_valid_lock);
-		INFO("aquired addr_valid_lock");
-		
+		INFO("th %d: aquired addr_valid_lock",(int)targ->id);
 
 		while( tp->new_fn == NULL ) {
 			pthread_cond_wait(&tp->addr_valid_signal,
@@ -47,9 +58,15 @@ void *wait_for_work(void *tp_v)
 		pthread_cond_signal(&tp->addr_null_signal);
 
 		pthread_mutex_unlock(&tp->addr_valid_lock);
-		//pthread_mutex_unlock(&tp->work_lock);
+		pthread_mutex_unlock(&tp->work_lock);
 
+		INFO("th %d: GOT WORK",(int)targ->id);
+		if (work_func == pthread_exit) {
+			INFO("th %d: dieing",(int)targ->id);
+		}
 		work_func(work_args);
+	
+		INFO("th %d: back from work",(int)targ->id);
 	}
 }
 
@@ -57,22 +74,26 @@ void dispatch(threadpool tp_v, dispatch_fn func, void *func_arg)
 {
 	tpool_t *tp = tp_v;
 
-
 	/* Give the pool new work */
 	pthread_mutex_lock(&tp->addr_valid_lock);
+	INFO("aquired addr_valid_lock");
 	tp->new_fn = func;
 	tp->new_fn_arg = func_arg;
 	pthread_mutex_unlock(&tp->addr_valid_lock);
 
+	INFO("signalling that work is ready");
 	pthread_cond_signal(&tp->addr_valid_signal);
+	
 
 	/* wait for work to start */
 	pthread_mutex_lock(&tp->addr_null_lock);
+	INFO("got addr_null_lock");
 	while( tp->new_fn != NULL ) {
 		pthread_cond_wait(&tp->addr_null_signal,
 		                  &tp->addr_null_lock);
 	}
 	
+	INFO("detected work start");
 	/* work started... */
 	pthread_mutex_unlock(&tp->addr_null_lock);
 
@@ -87,7 +108,9 @@ void destroy_threadpool(threadpool tp_v)
 	{	
 		int i;
 		for( i = 0; i < tp->thread_ct; i++ ) {
+			INFO("Sent death to %d",i);
 			dispatch(tp_v,pthread_exit,NULL);
+			INFO("It (%d) should be dead now.",i);
 		}
 	}
 
@@ -100,10 +123,10 @@ void destroy_threadpool(threadpool tp_v)
 	if (ret != 0) {
 		WARN(1,ret,"pthread mutex destroy of addr_null_lock failed");
 	}
-	//ret = pthread_mutex_destroy(&tp->work_lock);
-	//if (ret != 0) {
-	//	WARN(1,ret,"pthread mutex destroy of work_lock failed");
-	//}
+	ret = pthread_mutex_destroy(&tp->work_lock);
+	if (ret != 0) {
+		WARN(1,ret,"pthread mutex destroy of work_lock failed");
+	}
 
 
 	ret = pthread_cond_destroy(&tp->addr_valid_signal);
@@ -115,7 +138,7 @@ void destroy_threadpool(threadpool tp_v)
 	if (ret != 0) {
 		WARN(1,ret,"pthread cond destroy of addr_null_signal failed");
 	}
-
+	free(tp->targs);
 	free(tp);
 }
 
@@ -151,7 +174,6 @@ threadpool create_threadpool(int nth)
 
 
 	/* Initialize mutexes */
-	//pthread_mutex_init(&tp->work_lock,NULL);
 	ret = pthread_mutex_init(&tp->addr_valid_lock,NULL);
 	if (ret != 0) {
 		WARN(1,ret,"pthread cond init of addr_valid_lock failed");
@@ -162,12 +184,23 @@ threadpool create_threadpool(int nth)
 		WARN(1,ret,"pthread cond init of addr_null_lock failed");
 	}
 
+	ret = pthread_mutex_init(&tp->work_lock,NULL);
+	if (ret != 0) {
+		WARN(1,ret,"pthread cond init of work failed");
+	}
+
+	tp->targs = malloc(sizeof(*(tp->targs)) * nth);
+	if (!(tp->targs)) {
+		WARN(1,ret,"could not allocate space for targs");
+	}
+
 	/* spawn required threads */
 	int i;
 	for( i = 0; i < nth; i++ ) {
-		pthread_t thid;
-		int ret = pthread_create(&thid, NULL,
-		                         wait_for_work, tp);
+		tp->targs[i].tp = tp;
+		INFO("Spawining %d",i);
+		int ret = pthread_create(&tp->targs[i].id, NULL,
+		                         wait_for_work, &tp->targs[i]);
 
 		if (ret != 0) {
 			WARN(1,ret,"pthread create %d of %d failed",i,nth);
