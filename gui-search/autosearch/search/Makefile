@@ -6,7 +6,7 @@ HEADER = tokenizer.h index.h sorted-list.h util.h
 OBJ   = $(SOURCE:=.o)
 TRASH = gmon.out
 
-ALL_CFLAGS = -Wall -pthread $(CFLAGS)
+ALL_CFLAGS = -Wall -pthread -lm $(CFLAGS)
 ALL_LDFLAGS= $(ALL_CFLAGS) $(LDFLAGS) 
 
 CC = gcc

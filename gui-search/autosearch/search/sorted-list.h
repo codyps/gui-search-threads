@@ -6,7 +6,7 @@
  * a = b -> = 0
  */
 typedef int (*CompareFuncT) (void *a, void *b);
-typedef void (*UninoFuncT) (void *d, void *s); /* destination <- source */
+typedef void (*UnionFuncT) (void *d, void *s); /* destination <- source */
 
 typedef struct SortedList *SortedListPtr;
 typedef struct SortedListIterator *SortedListIteratorPtr;

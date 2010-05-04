@@ -3,10 +3,12 @@
 #include <errno.h>
 #include <string.h>
 #include <stdarg.h>
+#include <math.h>
 #include "tokenizer.h"
 #include "sorted-list.h"
 #include "index.h"
 #include "util.h"
+#include "threadpool.h"
 
 #if DEBUG
 static void print_fileents( SortedListPtr fileents, char sep, char *pretty_seps,
@@ -140,14 +142,14 @@ struct score {
 
 int cmp_score_by_filename(void *a_, void *b_)
 {
-	struct score a = a_, b = b_;
+	struct score *a = a_, *b = b_;
 
 	return strcoll(a->filename,b->filename);
 }
 
 int cmp_score_by_score(void *a_, void *b_)
 {
-	struct score a = a_, b = b_;
+	struct score *a = a_, *b = b_;
 
 	long double x = a->score - b->score;
 	if (x != 0) {
@@ -163,7 +165,7 @@ struct query_data {
 	SortedListPtr /* of fileents */ fileents; /* ALL fileents */
 	
 	keyword_t **words;	
-	size_t word_ct; /* the n */
+	size_t words_ct; /* the n */
 
 };
 
@@ -205,7 +207,7 @@ void worker_thread(void *data_v)
 	fileent_t *our_curr_file;
 
 	// for each of our word's files,
-	while (our_curr_file = SLNextItem(our_files)) {
+	while ( (our_curr_file = SLNextItem(our_files)) ) {
 		// create a skeleton struct for score with the value set to 0.
 		struct score *curr_file_score = malloc(sizeof(*curr_file_score));
 		if (!curr_file_score) {
@@ -224,10 +226,10 @@ void worker_thread(void *data_v)
 			
 		// for each term in the query.
 		size_t i;
-		for(i = 0; i < data->q_data->word_ct; i++) {
+		for(i = 0; i < data->q_data->words_ct; i++) {
 				keyword_t *curr_term = data->q_data->words[i];
-				fileent_t our_file_in_term;
-				our_file_in_term = SLLookup(curr_term->fileent,our_curr_file);
+				fileent_t *our_file_in_term;
+				our_file_in_term = SLLookup(curr_term->fileents,our_curr_file);
 
 				// if our_file is not in this term,
 				if (our_file_in_term == NULL)
@@ -241,7 +243,7 @@ void worker_thread(void *data_v)
 		}
 
 		/* Need |F| */
-		fileent_t file_abs_f = SLLookup(data->q_data->fileents,our_curr_file);
+		fileent_t *file_abs_f = SLLookup(data->q_data->fileents,our_curr_file);
 		if (!file_abs_f) {
 			/*XXX: error */
 		}
@@ -270,10 +272,10 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 			words_ct++;
 			words = realloc(words, words_ct * sizeof(*words));
 
-			words[words_ct-1] = k;
+			words[words_ct-1] = *k;
 
 			/* Create the SortedList of all fileents */
-			SLUnionSmart(fileents,k->fileents,merge_fileent);
+			SLUnionSmart(fileents,(*k)->fileents,merge_fileent);
 			
 		}
 	}
@@ -287,7 +289,7 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 		q_data.fileents = fileents;
 
 		//create the threadpool
-		threadpool tp = create_thread(thread_count);
+		threadpool tp = create_threadpool(thread_count);
 
 		// allocate thread data.
 		struct thread_data *t_datas = malloc(sizeof(*t_datas) * words_ct);
@@ -297,7 +299,7 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 			t_datas[i].word_i = i;
 
 			// dispatch work to thread.
-			dispatch(tp, workerthread, &t_datas[i]);
+			dispatch(tp, worker_thread, &t_datas[i]);
 		}
 
 		// wait for all threads to complete.
@@ -314,7 +316,7 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 		if (sort_iter) {
 			SortedListPtr scores_sorted = SLCreate(cmp_score_by_score);
 			struct score *s;
-			while(s = SLNextItem(sort_iter)) {
+			while(( s = SLNextItem(sort_iter) )) {
 				SLInsert(scores_sorted,s);
 			}
 			SLDestroyIterator(sort_iter);
@@ -327,11 +329,11 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 				s2 = SLNextItem(iter);
 				if (s2) {
 					// print the first term.
-					fprintf(stdout,"%s (%lf)",s2->filename,s2->score);
+					fprintf(stdout,"%s (%Lf)",s2->filename,s2->score);
 					free(s2);
 					while((s2 = SLNextItem(iter))) {
 						// print following terms preceded by a comma.
-						fprintf(stdout, ", %s (%lf)",s2->filename,s2->score);
+						fprintf(stdout, ", %s (%Lf)",s2->filename,s2->score);
 						free(s2);
 					}
 					fputs(".\n",stdout);
@@ -370,7 +372,7 @@ int q(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thr
 	exit(EXIT_SUCCESS);
 }
 
-typedef int (*cmd_func)(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords);
+typedef int (*cmd_func)(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords, int thread_count);
 
 struct cmd {
 	const char *name;
@@ -388,11 +390,10 @@ int main(int argc, char **argv)
 {
 	size_t n_keywords;
 	keyword_t **keywords;
-	SortedListPtr filedatas; /* files sorted by filename */
+	int thread_count;
 
-
-	if (argc != 2) {
-		fprintf(stderr,"usage: %s <index file>\n",argv[0]);
+	if (argc != 3) {
+		fprintf(stderr,"usage: %s <index file> <thread count>\n",argv[0]);
 		return 1;
 	}
 
@@ -400,7 +401,12 @@ int main(int argc, char **argv)
 	if (!fp || ferror(fp)) {
 		error_at_line(-1,errno,__FILE__,__LINE__,"could not open \"%s\"",argv[1]);
 	}
-
+	
+	int ret = sscanf(argv[2], "%d", &thread_count);
+	if(ret != 1 || thread_count < 1){
+		error_at_line(-1,errno,__FILE__,__LINE__,"Invalid thread count \"%s\"",argv[2]);
+	}
+	
 	keywords = index_read(&n_keywords,fp);
 	fclose(fp);
 	if (!keywords) {
@@ -444,7 +450,7 @@ int main(int argc, char **argv)
 					if (cmds[i].name) {
 						if (!strcmp(cmds[i].name,cmd)) {
 							args = tok2arg(&n_args,toker);
-							cmds[i].func(n_args,args,n_keywords,keywords);
+							cmds[i].func(n_args,args,n_keywords,keywords, thread_count);
 							free_args(n_args,args);
 							break;
 						}

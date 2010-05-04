@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include "sorted-list.h"
+#include <pthread.h>
 
 /** tree interface **/
 typedef struct bstnode {
@@ -187,8 +188,8 @@ void tree_union_smart(node_t **d, node_t *s, size_t *n, CompareFuncT cmp, UnionF
 	if (s) {
 		if (insert_into_bst_smart(d,s->data,cmp,uf))
 			(*n)++;
-		tree_union(d,s->left,n,cmp,uf);
-		tree_union(d,s->right,n,cmp,uf);
+		tree_union_smart(d,s->left,n,cmp,uf);
+		tree_union_smart(d,s->right,n,cmp,uf);
 	}
 }
 
@@ -241,14 +242,14 @@ SortedListPtr SLCreate(CompareFuncT cmp)
 		s->ct = 0;
 		s->cmp = cmp;
 		s->iter_ct = 0;
-		pthread_rwlock_init(s->rwlock,NULL);
+		pthread_rwlock_init(&s->rwlock,NULL);
 	}
 	return s;
 }
 
 void SLDestroy(SortedListPtr list)
 {
-	pthread_rwlock_destroy(s->rwlock);
+	pthread_rwlock_destroy(&list->rwlock);
 	freebst(list->root);
 	free(list);
 }
@@ -256,13 +257,13 @@ void SLDestroy(SortedListPtr list)
 
 int SLUnionSmart(SortedListPtr d, const SortedListPtr s, UnionFuncT uf) {
 
-	pthread_rwlock_rdlock(s->rwlock);
-	pthread_rwlock_wrlock(d->rwlock);
+	pthread_rwlock_rdlock(&s->rwlock);
+	pthread_rwlock_wrlock(&d->rwlock);
 
 	tree_union_smart(&(d->root),s->root,&(d->ct),d->cmp,uf);
 	
-	pthread_rwlock_unlock(s->rwlock);
-	pthread_rwlock_unlock(d->rwlock);
+	pthread_rwlock_unlock(&s->rwlock);
+	pthread_rwlock_unlock(&d->rwlock);
 
 	return 1;
 }
@@ -276,13 +277,13 @@ int SLUnion(SortedListPtr d, const SortedListPtr s) {
 	}
 	return 0;
 	*/
-	pthread_rwlock_rdlock(s->rwlock);
-	pthread_rwlock_wrlock(d->rwlock);
+	pthread_rwlock_rdlock(&s->rwlock);
+	pthread_rwlock_wrlock(&d->rwlock);
 
 	tree_union(&(d->root),s->root,&(d->ct),d->cmp);
 	
-	pthread_rwlock_unlock(s->rwlock);
-	pthread_rwlock_unlock(d->rwlock);
+	pthread_rwlock_unlock(&s->rwlock);
+	pthread_rwlock_unlock(&d->rwlock);
 
 	return 1;
 }
@@ -309,13 +310,13 @@ int SLIntersect(SortedListPtr d, const SortedListPtr s) {
 	return 0;
 	*/
 
-	pthread_rwlock_rdlock(s->rwlock);
-	pthread_rwlock_wrlock(d->rwlock);
+	pthread_rwlock_rdlock(&s->rwlock);
+	pthread_rwlock_wrlock(&d->rwlock);
 	
 	tree_intersect(&(d->root),s->root,&(d->ct),d->cmp);
 
-	pthread_rwlock_unlock(s->rwlock);
-	pthread_rwlock_unlock(d->rwlock);
+	pthread_rwlock_unlock(&s->rwlock);
+	pthread_rwlock_unlock(&d->rwlock);
 
 	return 1;
 }
@@ -323,7 +324,7 @@ int SLIntersect(SortedListPtr d, const SortedListPtr s) {
 
 SortedListPtr SLDup(SortedListPtr s) {
 	if (s) {
-		pthread_rwlock_rdlock(s->rwlock);
+		pthread_rwlock_rdlock(&s->rwlock);
 
 		SortedListPtr n = malloc(sizeof(*n));
 		if (n) {
@@ -332,9 +333,9 @@ SortedListPtr SLDup(SortedListPtr s) {
 			n->cmp = s->cmp;
 			n->iter_ct = 0;
 
-			pthread_rwlock_init(n->rwlock,NULL);
+			pthread_rwlock_init(&n->rwlock,NULL);
 		}
-		pthread_rwlock_unlock(s->rwlock);
+		pthread_rwlock_unlock(&s->rwlock);
 		return n;
 	} else {
 		return 0;
@@ -343,17 +344,17 @@ SortedListPtr SLDup(SortedListPtr s) {
 
 void *SLLookup(SortedListPtr s, void *data) {
 	void *ret;
-	pthread_rwlock_rdlock(s->rwlock);
+	pthread_rwlock_rdlock(&s->rwlock);
 	ret = tree_lookup(s->root,data,s->cmp);
-	pthread_rwlock_unlock(s->rwlock);
+	pthread_rwlock_unlock(&s->rwlock);
 	return ret;
 }
 
 size_t SLGetCt(SortedListPtr list) {
 	size_t ret;
-	pthread_rwlock_rdlock(s->rwlock);
+	pthread_rwlock_rdlock(&list->rwlock);
 	ret = list->ct;
-	pthread_rwlock_unlock(s->rwlock);
+	pthread_rwlock_unlock(&list->rwlock);
 	return ret;
 }
 
@@ -367,7 +368,7 @@ int SLInsert(SortedListPtr list, void *newObj)
 	if (ret)
 		list->ct++;
 
-	pthread_rwlock_unlock(list->rwlock);
+	pthread_rwlock_unlock(&list->rwlock);
 	return ret;
 }
 
@@ -375,11 +376,11 @@ int SLInsert(SortedListPtr list, void *newObj)
 int SLRemove(SortedListPtr list, void *newObj)
 {
 	node_t *ret;
-	pthread_rwlock_wrlock(list->rwlock);
+	pthread_rwlock_wrlock(&list->rwlock);
 	ret = delete_from_bst(&(list->root), newObj, list->cmp);
 	if (ret)
 		list->ct--;
-	pthread_rwlock_unlock(list->rwlock);
+	pthread_rwlock_unlock(&list->rwlock);
 	return !!ret;
 }
 
@@ -387,7 +388,7 @@ SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 {
 	SortedListIteratorPtr iter;
 
-	pthread_rwlock_rdlock(list->rwlock);
+	pthread_rwlock_rdlock(&list->rwlock);
 
 	list->iter_ct++;
 	iter = malloc(sizeof(*iter));
@@ -408,11 +409,11 @@ SortedListIteratorPtr SLCreateIterator(SortedListPtr list)
 void SLDestroyIterator(SortedListIteratorPtr iter)
 {
 	free(iter->start);
-	pthread_rwlock_unlock(list->rwlock);
-	pthread_rwlock_rwlock(list->rwlock);
+	pthread_rwlock_unlock(&iter->list->rwlock);
+	pthread_rwlock_wrlock(&iter->list->rwlock);
 	iter->list->iter_ct--;
 
-	pthread_rwlock_unlock(list->rwlock);
+	pthread_rwlock_unlock(&iter->list->rwlock);
 	free(iter);
 }
 
