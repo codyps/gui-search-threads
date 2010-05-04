@@ -6,9 +6,16 @@ Steven Liberto
 
 gui-search:
 
-	Gui-search was altered in such a way to 
+	Gui-search was altered in such a way to add thread functionality.
+The menu prefernces were altered to include another text entry field.  This field allows the user to select the number of threads for the threaded search to run.  The default thread number is 1.  If an invalid thread number is entered a pop-up error box is created to alter the user.  This occurs until the user selects an appropriate thread number.  The thread number is then added to the global struct containing the information needed for autoindexing and searching.
+
+The search function call was also altered in such a way as to pass in an extra argument into the autosearch.  The extra argument is from the global struct, it is the thread number.
+
+The gui interface was also simplified to reflect the new search parameters.  The Radio buttons used to select whether to search using logical and or logical or were removed.  This is done because the threaded search tool is only to work with logical or queries.
 	
 autosearch:
+
+	Autosearch functionality was changed to reflect the thread number being entered as another argument.  It takes in the thread number as an argument and sets it to a variable.  When search is called the argument is passed into search.  The error conditions for autosearch was also updated to reflect the new minimum of arguments for autosearch to run.
 
 search:
 
