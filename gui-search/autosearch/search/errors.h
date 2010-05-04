@@ -15,7 +15,7 @@
 			__func__,__LINE__,__VA_ARGS__); \
 	} while(0)
 
-extern int debug;
+//extern int debug;
 
 void __attribute__((format(printf,5,6)))
 perror_at_line(int status, int errnum, const char *fname,

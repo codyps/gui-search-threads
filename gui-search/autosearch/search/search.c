@@ -9,6 +9,9 @@
 #include "index.h"
 #include "util.h"
 #include "threadpool.h"
+#include "errors.h"
+
+static int debug = 0;
 
 #if DEBUG
 static void print_fileents( SortedListPtr fileents, char sep, char *pretty_seps,
@@ -212,12 +215,15 @@ void worker_thread(void *data_v)
 		struct score *curr_file_score = malloc(sizeof(*curr_file_score));
 		if (!curr_file_score) {
 			/* XXX: error */
+			WARN(1,errno,"could not allocate curr_file_score");
 		}
 		curr_file_score->filename = our_curr_file->filename;
 		curr_file_score->score = 0;
 
-		if (!SLInsert(scores,&curr_file_score)) {
+		/* XXX: possible issue */
+		if (!SLInsert(scores,curr_file_score)) {
 			/* Someone is already at work. */
+			INFO("Someone already is working on %s",our_curr_file->filename);
 			continue;
 		}
 	
@@ -232,8 +238,10 @@ void worker_thread(void *data_v)
 				our_file_in_term = SLLookup(curr_term->fileents,our_curr_file);
 
 				// if our_file is not in this term,
-				if (our_file_in_term == NULL)
+				if (our_file_in_term == NULL) {
+					INFO("our_file %s is not in term %s",our_curr_file->filename,curr_term->word);
 					continue;
+				}
 
 				long double Ft = our_file_in_term->ct;
 				long double N = SLGetCt(data->q_data->fileents);
@@ -246,11 +254,13 @@ void worker_thread(void *data_v)
 		fileent_t *file_abs_f = SLLookup(data->q_data->fileents,our_curr_file);
 		if (!file_abs_f) {
 			/*XXX: error */
+			WARN(1,errno,"could not locate the desired fileent %s in the global list",our_curr_file->filename);
 		}
 
 		long double abs_F = file_abs_f->ct;
 		
 		curr_file_score->score /= sqrt(abs_F);
+		INFO("File %s has a score %Lf",curr_file_score->filename,curr_file_score->score);
 
 		// score(Q,F) should be calculated. yay.
 	}
@@ -297,6 +307,8 @@ static int so(size_t argc, char **argv, size_t n_keywords, keyword_t **keywords,
 			// populate thread data.
 			t_datas[i].q_data = &q_data;
 			t_datas[i].word_i = i;
+
+			INFO("dispatching thread %d on %s",i,words[i]->word);
 
 			// dispatch work to thread.
 			dispatch(tp, worker_thread, &t_datas[i]);

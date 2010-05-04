@@ -4,8 +4,7 @@
 #include "threadpool.h"
 #include "errors.h"
 
-int debug = 1;
-
+static int debug = 0;
 typedef struct tpool_s tpool_t;
 
 struct thread_arg {
