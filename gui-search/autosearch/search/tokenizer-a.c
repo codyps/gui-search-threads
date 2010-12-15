@@ -7,7 +7,7 @@
 #include <string.h>
 #include "tokenizer.h"
 
-static char *strndup(const char *old, size_t strlen) {
+static char *strndup2(const char *old, size_t strlen) {
 	char *new = malloc(strlen+1);
 	if (new) {
 		memcpy(new,old,strlen+1);
@@ -95,6 +95,6 @@ char *TKGetNextToken(TokenizerT tk) {
 		tk->cur = cur_start + cur_len + junk_len;
 	}
 
-	return strndup(cur_start, cur_len);
+	return strndup2(cur_start, cur_len);
 }
 
